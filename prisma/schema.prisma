@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PlatformRole { USER OPERATIONS FINANCE ADMIN }
+enum MembershipRole { OWNER ADMIN PROJECT_MANAGER MEMBER }
+enum AccountContext { BUSINESS SPECIALIST CREATOR }
+enum ProjectStatus { DRAFT SUBMITTED IN_REVIEW MATCHING ACTIVE COMPLETED CANCELLED }
+enum ProjectPath { INDIVIDUAL TEAM }
+enum WorkstreamStatus { PROPOSED APPROVED STAFFING ACTIVE COMPLETED }
+enum EngagementStatus { INVITED PROPOSED NEGOTIATING AGREED ACTIVE COMPLETED CANCELLED DISPUTED }
+enum ProposalStatus { OPEN ACCEPTED DECLINED WITHDRAWN SUPERSEDED }
+enum AgreementStatus { DRAFT PENDING_ACCEPTANCE ACTIVE SUPERSEDED COMPLETED CANCELLED }
+enum MilestoneStatus { NOT_STARTED IN_PROGRESS SUBMITTED IN_REVIEW REVISION_REQUESTED APPROVED DISPUTED }
+enum VerificationStatus { NOT_STARTED IN_REVIEW VERIFIED REJECTED EXPIRED }
+enum CampaignStatus { DRAFT INVITING ACTIVE PAUSED COMPLETED CANCELLED }
+enum CompensationStatus { PENDING SIMULATED_PAID PROVIDER_CONFIRMED_PAID FAILED REFUNDED DISPUTED }
+
+model User {
+  id              String       @id @default(cuid())
+  name            String
+  email           String       @unique
+  passwordHash    String
+  emailVerifiedAt DateTime?
+  platformRole    PlatformRole @default(USER)
+  disabledAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  memberships     OrganisationMembership[]
+  specialist      ProfessionalProfile?
+  creator         CreatorProfile?
+  projectsCreated Project[]    @relation("ProjectCreator")
+  auditEvents     AuditLog[]   @relation("AuditActor")
+  notifications   Notification[]
+}
+
+model Organisation {
+  id          String   @id @default(cuid())
+  name        String
+  website     String?
+  industry    String?
+  model       String?
+  product     String?
+  location    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  memberships OrganisationMembership[]
+  projects    Project[]
+}
+
+model OrganisationMembership {
+  id             String         @id @default(cuid())
+  organisationId String
+  userId         String
+  role           MembershipRole @default(MEMBER)
+  canApproveSpend Boolean       @default(false)
+  createdAt      DateTime       @default(now())
+  organisation   Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([organisationId, userId])
+  @@index([userId, role])
+}
+
+model ProfessionalProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  headline           String?
+  biography          String?
+  country            String             @default("Nigeria")
+  city               String?
+  languages          String[]
+  categories         String[]
+  skills             String[]
+  availability       String?
+  indicativeRate     Int?
+  currency           String             @default("NGN")
+  verificationStatus VerificationStatus @default(NOT_STARTED)
+  isPublished        Boolean            @default(false)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio          PortfolioItem[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model CreatorProfile {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  biography          String?
+  country            String             @default("Nigeria")
+  platforms          String[]
+  contentCategories  String[]
+  audienceEvidence   String?
+  verificationStatus VerificationStatus @default(NOT_STARTED)
+  isPublished        Boolean            @default(false)
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model PortfolioItem {
+  id          String              @id @default(cuid())
+  profileId   String
+  title       String
+  description String?
+  url         String?
+  contribution String?
+  createdAt   DateTime            @default(now())
+  profile     ProfessionalProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id             String       @id @default(cuid())
+  organisationId String
+  createdById    String
+  title          String
+  path           ProjectPath?
+  status         ProjectStatus @default(DRAFT)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdBy      User         @relation("ProjectCreator", fields: [createdById], references: [id])
+  brief          ProjectBrief?
+  workstreams    Workstream[]
+  engagements    Engagement[]
+  milestones     Milestone[]
+  @@index([organisationId, status, updatedAt])
+}
+
+model ProjectBrief {
+  id                    String   @id @default(cuid())
+  projectId             String   @unique
+  objective             String
+  targetMarket          String   @default("Nigeria")
+  targetAudience        String?
+  currentPresence       String?
+  currentCapabilities   String?
+  previousAttempts     String?
+  budgetMin             Int?
+  budgetMax             Int?
+  currency              String   @default("NGN")
+  deadline              DateTime?
+  constraints           String?
+  expectedOutcomes      String?
+  existingResources    String?
+  additionalInformation String?
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  updatedAt             DateTime @updatedAt
+}
+
+model Workstream {
+  id          String          @id @default(cuid())
+  projectId   String
+  name        String
+  description String
+  capabilities String[]
+  status      WorkstreamStatus @default(PROPOSED)
+  source      String          @default("RULE_BASED_SUGGESTION")
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+}
+
+model Engagement {
+  id          String           @id @default(cuid())
+  projectId   String
+  status      EngagementStatus @default(INVITED)
+  createdAt   DateTime         @default(now())
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proposals   Proposal[]
+  agreements  Agreement[]
+}
+
+model Proposal {
+  id            String         @id @default(cuid())
+  engagementId  String
+  authorId      String
+  amount        Int
+  currency      String         @default("NGN")
+  scope         String
+  deadline      DateTime?
+  revisions     Int            @default(0)
+  status        ProposalStatus @default(OPEN)
+  createdAt     DateTime       @default(now())
+  engagement    Engagement     @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+}
+
+model Agreement {
+  id           String          @id @default(cuid())
+  engagementId String
+  version      Int
+  status       AgreementStatus @default(DRAFT)
+  acceptedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  engagement   Engagement      @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  terms        AgreementVersion
+  @@unique([engagementId, version])
+}
+
+model AgreementVersion {
+  id          String    @id @default(cuid())
+  agreementId String    @unique
+  scope       String
+  deliverables String[]
+  amount      Int
+  currency    String    @default("NGN")
+  revisionTerms String?
+  dueAt       DateTime?
+  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+model Milestone {
+  id         String          @id @default(cuid())
+  projectId  String
+  title      String
+  dueAt      DateTime?
+  status     MilestoneStatus @default(NOT_STARTED)
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  createdAt  DateTime        @default(now())
+}
+
+model Submission {
+  id          String    @id @default(cuid())
+  milestoneId String
+  submittedBy String
+  note        String
+  createdAt   DateTime  @default(now())
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+}
+
+model Campaign {
+  id        String         @id @default(cuid())
+  title     String
+  status    CampaignStatus @default(DRAFT)
+  createdAt DateTime       @default(now())
+  creators  CampaignCreator[]
+}
+
+model CampaignCreator {
+  id          String   @id @default(cuid())
+  campaignId  String
+  creatorId   String
+  fixedFee    Int      @default(0)
+  bonusTerms  String?
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  @@unique([campaignId, creatorId])
+}
+
+model CompensationObligation {
+  id           String             @id @default(cuid())
+  reference    String             @unique
+  amount       Int
+  currency     String
+  status       CompensationStatus @default(PENDING)
+  provider     String             @default("MOCK")
+  simulated    Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  ledgerEntries LedgerEntry[]
+}
+
+model LedgerEntry {
+  id            String                @id @default(cuid())
+  obligationId  String
+  kind          String
+  amount        Int
+  currency      String
+  simulated     Boolean               @default(true)
+  providerEventId String?
+  obligation    CompensationObligation @relation(fields: [obligationId], references: [id])
+  createdAt     DateTime              @default(now())
+  @@index([obligationId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([entityType, entityId, createdAt])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  purpose    String
+  expires    DateTime
+  @@index([identifier, purpose])
+}
