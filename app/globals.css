@@ -183,6 +183,41 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .prose-page h2 { margin: 36px 0 8px; font-size: 18px; }
 .prose-page p, .prose-page li { color: #58615b; font-size: 14px; }
 .legal-note { margin-top: 30px; border-left: 3px solid var(--amber); padding: 12px 16px; color: #765119; background: #faf1e4; font-size: 12px; }
+.account-context-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.account-context-card { display: grid; gap: 4px; min-height: 100px; border: 1px solid var(--line); border-radius: 5px; padding: 15px 17px; background: var(--surface); }
+.account-context-card:hover { border-color: #d6b3a8; }
+.account-context-card span { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.account-context-card strong { font-size: 14px; text-transform: capitalize; }
+.account-context-card small { color: var(--muted); font-size: 10px; }
+.empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
+.form-actions-split { justify-content: space-between; }
+.context-tabs { display: flex; gap: 8px; margin: -6px 0 16px; border-bottom: 1px solid var(--line); }
+.context-tab { border-bottom: 2px solid transparent; padding: 10px 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.context-tab.active { border-color: var(--accent); color: var(--ink); }
+.profile-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.organisation-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, .8fr); align-items: start; gap: 16px; }
+.organisation-list { display: grid; gap: 14px; }
+.org-intro, .org-meta { margin: 0; color: var(--muted); font-size: 12px; }
+.org-subhead { margin: 22px 0 8px; font-size: 12px; }
+.member-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.member-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #efede8; padding: 10px 0; }
+.member-list li:last-child { border-bottom: 0; }
+.member-list strong, .member-list small { display: block; }
+.member-list strong { font-size: 11px; }
+.member-list small { color: var(--muted); font-size: 10px; }
+.invite-details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.invite-details summary { color: var(--ink); cursor: pointer; font-size: 12px; font-weight: 700; }
+.invite-details-content { padding-top: 16px; }
+.invite-form { gap: 12px; }
+.org-notice { margin-bottom: 14px; }
+.professional-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 14px; }
+.professional-summary h3 { margin: 0 0 5px; font-size: 14px; }
+.professional-summary > p { min-height: 38px; margin: 0; color: var(--muted); font-size: 11px; }
+.professional-summary dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+.professional-summary dl div { min-width: 0; border-top: 1px solid var(--line); padding-top: 9px; }
+.professional-summary dt { color: var(--muted); font-size: 9px; }
+.professional-summary dd { overflow-wrap: anywhere; margin: 3px 0 0; font-size: 11px; font-weight: 700; }
+.professional-note { display: block; margin-top: 14px; }
 @media (max-width: 900px) {
   .marketing-nav { display: none; }
   .hero { grid-template-columns: 1fr 1fr; gap: 30px; }
@@ -191,6 +226,8 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .app-sidebar { padding-inline: 10px; }
   .project-form-layout { grid-template-columns: 1fr; }
   .aside-card { display: none; }
+  .organisation-layout { grid-template-columns: 1fr; }
+  .professional-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
   .wrap { width: min(100% - 32px, 540px); }
@@ -240,6 +277,12 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .form-actions { flex-direction: column-reverse; }
   .form-actions .button { width: 100%; }
   .talent-grid { grid-template-columns: 1fr; }
+  .account-context-grid { grid-template-columns: 1fr; }
+  .account-context-card { min-height: 86px; }
+  .form-actions-split { flex-direction: column; }
+  .profile-status-row { align-items: start; }
+  .profile-status-row .field-note { flex-basis: 100%; }
+  .member-list li { align-items: start; }
   .prose-page { padding-block: 42px 60px; }
   .prose-page h1 { font-size: 37px; }
 }

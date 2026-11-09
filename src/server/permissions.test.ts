@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canApproveSpend, canInviteOrganisationMembers, canManageProjects } from "./permissions";
+import { canApproveSpend, canAssignOrganisationRole, canInviteOrganisationMembers, canManageProjects } from "./permissions";
 
 test("only owners, admins, and project managers can create or submit briefs", () => {
   assert.equal(canManageProjects("OWNER"), true);
@@ -19,4 +19,11 @@ test("member invitations are restricted to organisation owners and admins", () =
   assert.equal(canInviteOrganisationMembers("ADMIN"), true);
   assert.equal(canInviteOrganisationMembers("PROJECT_MANAGER"), false);
   assert.equal(canInviteOrganisationMembers("MEMBER"), false);
+});
+
+test("only organisation owners can appoint another owner", () => {
+  assert.equal(canAssignOrganisationRole("OWNER", "OWNER"), true);
+  assert.equal(canAssignOrganisationRole("ADMIN", "OWNER"), false);
+  assert.equal(canAssignOrganisationRole("ADMIN", "MEMBER"), true);
+  assert.equal(canAssignOrganisationRole("PROJECT_MANAGER", "MEMBER"), false);
 });

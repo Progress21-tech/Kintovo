@@ -51,7 +51,7 @@ export async function registerAccount(_state: { error?: string; success?: string
         } });
         await tx.organisationMembership.create({ data: { organisationId: organisation.id, userId: user.id, role: "OWNER" } });
       } else if (parsed.data.context === "SPECIALIST") {
-        await tx.professionalProfile.create({ data: { userId: user.id, headline: "New Kintovo professional", categories: [], skills: [], languages: ["English"] } });
+        await tx.professionalProfile.create({ data: { userId: user.id, categories: [], skills: [], languages: ["English"] } });
       } else {
         await tx.creatorProfile.create({ data: { userId: user.id, platforms: [], contentCategories: [] } });
       }

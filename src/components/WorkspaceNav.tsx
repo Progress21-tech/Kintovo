@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const links = [
-  ["◷", "Overview", "/workspace"],
-  ["▤", "Project briefs", "/workspace/projects"],
-  ["⌕", "Find talent", "/workspace/talent"],
-  ["↔", "Agreements", "/workspace/agreements"],
-  ["◉", "Payments", "/workspace/payments"],
-  ["⚙", "Settings", "/workspace/profile"],
-];
+type WorkspaceNavProps = { business: boolean; specialist: boolean; creator: boolean };
 
-export function WorkspaceNav() {
+export function WorkspaceNav({ business, specialist, creator }: WorkspaceNavProps) {
+  const links = [
+    ["◷", "Overview", "/workspace"],
+    ...(business ? [["▤", "Project briefs", "/workspace/projects"], ["⌕", "Find talent", "/workspace/talent"], ["↔", "Agreements", "/workspace/agreements"], ["◉", "Payments", "/workspace/payments"]] : []),
+    ...(specialist || creator ? [["✦", "Professional home", "/workspace/professional"]] : []),
+    ["⚙", "Profile", "/workspace/profile"],
+    ["♧", "Organisations", "/workspace/organisations"],
+  ];
   const pathname = usePathname();
   return <aside className="app-sidebar"><span className="nav-caption">Workspace</span>{links.map(([icon, label, href]) => {
     const active = href === "/workspace" ? pathname === href : pathname.startsWith(href);

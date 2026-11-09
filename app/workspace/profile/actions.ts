@@ -15,6 +15,13 @@ const profileInput = z.object({
   availability: z.string().trim().max(160).optional(),
   rate: z.string().optional(),
   platforms: z.string().max(500).optional(),
+  yearsExperience: z.string().optional(),
+  marketExperience: z.string().trim().max(1000).optional(),
+  audienceSize: z.string().optional(),
+  audienceGeography: z.string().trim().max(500).optional(),
+  audienceEvidence: z.string().trim().max(1500).optional(),
+  portfolio: z.string().max(5000).optional(),
+  intent: z.enum(["SAVE", "SUBMIT"]).default("SAVE"),
 });
 
 function splitList(value: string | undefined) {
@@ -27,19 +34,68 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the profile details and try again." };
   const rate = parsed.data.rate?.trim() ? Number(parsed.data.rate) : undefined;
   if (rate !== undefined && (!Number.isSafeInteger(rate) || rate < 0)) return { error: "Enter a valid whole-number indicative rate." };
+  const yearsExperience = parsed.data.yearsExperience?.trim() ? Number(parsed.data.yearsExperience) : undefined;
+  if (yearsExperience !== undefined && (!Number.isSafeInteger(yearsExperience) || yearsExperience < 0 || yearsExperience > 80)) return { error: "Enter years of experience as a whole number from 0 to 80." };
+  const audienceSize = parsed.data.audienceSize?.trim() ? Number(parsed.data.audienceSize) : undefined;
+  if (audienceSize !== undefined && (!Number.isSafeInteger(audienceSize) || audienceSize < 0)) return { error: "Enter a valid whole-number audience size." };
+  const portfolioItems = (parsed.data.portfolio ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
+  if (portfolioItems.length > 10) return { error: "Add up to 10 portfolio items." };
+  const portfolio = portfolioItems.map((line) => {
+    const [title, url, ...contribution] = line.split("|").map((part) => part.trim());
+    if (!title || (url && !z.url().safeParse(url).success)) return null;
+    return { title, url: url || null, contribution: contribution.join(" | ").slice(0, 500) || null };
+  });
+  if (portfolio.some((item) => item === null)) return { error: "Portfolio lines use: title | https://link | your contribution. The link is optional." };
+  const submit = parsed.data.intent === "SUBMIT";
+  const specialistCategories = splitList(parsed.data.categories);
+  if (submit && parsed.data.context === "SPECIALIST" && (!parsed.data.headline?.trim() || !parsed.data.biography?.trim() || specialistCategories.length === 0)) {
+    return { error: "Before review, add a headline, a short description, and at least one professional category." };
+  }
+  if (submit && parsed.data.context === "CREATOR" && (!parsed.data.biography?.trim() || specialistCategories.length === 0)) {
+    return { error: "Before review, add a creator description and at least one content category." };
+  }
   if (parsed.data.context === "SPECIALIST") {
-    await db.professionalProfile.upsert({
-      where: { userId: user.id },
-      create: { userId: user.id, headline: parsed.data.headline || null, biography: parsed.data.biography || null, city: parsed.data.city || null, categories: splitList(parsed.data.categories), skills: splitList(parsed.data.skills), languages: splitList(parsed.data.languages), availability: parsed.data.availability || null, indicativeRate: rate ?? null },
-      update: { headline: parsed.data.headline || null, biography: parsed.data.biography || null, city: parsed.data.city || null, categories: splitList(parsed.data.categories), skills: splitList(parsed.data.skills), languages: splitList(parsed.data.languages), availability: parsed.data.availability || null, indicativeRate: rate ?? null },
+    const previous = await db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true, verificationStatus: true } });
+    const saved = {
+      headline: parsed.data.headline || null,
+      biography: parsed.data.biography || null,
+      city: parsed.data.city || null,
+      categories: specialistCategories,
+      skills: splitList(parsed.data.skills),
+      languages: splitList(parsed.data.languages),
+      availability: parsed.data.availability || null,
+      indicativeRate: rate ?? null,
+      yearsExperience: yearsExperience ?? null,
+      marketExperience: parsed.data.marketExperience || null,
+      ...(submit || previous?.verificationStatus === "VERIFIED" ? { onboardingCompletedAt: new Date(), verificationStatus: "IN_REVIEW" as const, isPublished: false } : {}),
+    };
+    await db.$transaction(async (tx) => {
+      const profile = await tx.professionalProfile.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, ...saved },
+        update: saved,
+      });
+      await tx.portfolioItem.deleteMany({ where: { profileId: profile.id } });
+      if (portfolio.length) await tx.portfolioItem.createMany({ data: portfolio.filter((item): item is NonNullable<typeof item> => item !== null).map((item) => ({ ...item, profileId: profile.id })) });
     });
   } else {
+    const previous = await db.creatorProfile.findUnique({ where: { userId: user.id }, select: { verificationStatus: true } });
+    const saved = {
+      biography: parsed.data.biography || null,
+      platforms: splitList(parsed.data.platforms),
+      contentCategories: specialistCategories,
+      audienceEvidence: parsed.data.audienceEvidence || null,
+      audienceSize: audienceSize ?? null,
+      audienceGeography: parsed.data.audienceGeography || null,
+      ...(submit || previous?.verificationStatus === "VERIFIED" ? { onboardingCompletedAt: new Date(), verificationStatus: "IN_REVIEW" as const, isPublished: false } : {}),
+    };
     await db.creatorProfile.upsert({
       where: { userId: user.id },
-      create: { userId: user.id, biography: parsed.data.biography || null, country: "Nigeria", platforms: splitList(parsed.data.platforms), contentCategories: splitList(parsed.data.categories) },
-      update: { biography: parsed.data.biography || null, platforms: splitList(parsed.data.platforms), contentCategories: splitList(parsed.data.categories) },
+      create: { userId: user.id, country: "Nigeria", ...saved },
+      update: saved,
     });
   }
-  await db.auditLog.create({ data: { actorId: user.id, action: "PROFILE_UPDATED", entityType: parsed.data.context === "SPECIALIST" ? "ProfessionalProfile" : "CreatorProfile", entityId: user.id } });
-  return { success: "Profile details saved. This profile is still private until the relevant review is complete." };
+  const entityType = parsed.data.context === "SPECIALIST" ? "ProfessionalProfile" : "CreatorProfile";
+  await db.auditLog.create({ data: { actorId: user.id, action: submit ? "PROFILE_SUBMITTED_FOR_REVIEW" : "PROFILE_UPDATED", entityType, entityId: user.id } });
+  return { success: submit ? "Profile submitted for human review. It remains private until an authorised reviewer records a decision." : "Profile details saved privately. Submit it for review when you are ready." };
 }

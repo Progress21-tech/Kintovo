@@ -11,3 +11,9 @@ export function canApproveSpend(role: MembershipRole, separatelyAuthorised: bool
 export function canInviteOrganisationMembers(role: MembershipRole) {
   return role === "OWNER" || role === "ADMIN";
 }
+
+export function canAssignOrganisationRole(actorRole: MembershipRole, invitedRole: MembershipRole) {
+  if (!canInviteOrganisationMembers(actorRole)) return false;
+  // Only owners may appoint another owner; an administrator cannot promote themselves.
+  return invitedRole !== "OWNER" || actorRole === "OWNER";
+}

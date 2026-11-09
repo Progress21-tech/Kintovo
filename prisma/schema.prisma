@@ -51,6 +51,21 @@ model Organisation {
   updatedAt   DateTime @updatedAt
   memberships OrganisationMembership[]
   projects    Project[]
+  invitations OrganisationInvitation[]
+}
+
+model OrganisationInvitation {
+  id              String         @id @default(cuid())
+  organisationId  String
+  email           String
+  role            MembershipRole @default(MEMBER)
+  canApproveSpend Boolean        @default(false)
+  token           String         @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  organisation    Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  @@index([organisationId, email, acceptedAt])
 }
 
 model OrganisationMembership {
@@ -78,6 +93,9 @@ model ProfessionalProfile {
   skills             String[]
   availability       String?
   indicativeRate     Int?
+  yearsExperience    Int?
+  marketExperience   String?
+  onboardingCompletedAt DateTime?
   currency           String             @default("NGN")
   verificationStatus VerificationStatus @default(NOT_STARTED)
   isPublished        Boolean            @default(false)
@@ -95,6 +113,9 @@ model CreatorProfile {
   platforms          String[]
   contentCategories  String[]
   audienceEvidence   String?
+  audienceSize       Int?
+  audienceGeography  String?
+  onboardingCompletedAt DateTime?
   verificationStatus VerificationStatus @default(NOT_STARTED)
   isPublished        Boolean            @default(false)
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
