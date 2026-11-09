@@ -33,9 +33,24 @@ export async function publishProfessionalProfile(formData: FormData) {
   const profile = await db.professionalProfile.findUnique({ where: { id: id.data }, include: { trustReviews: { where: { dimension: "PORTFOLIO_SKILLS", status: "APPROVED" } } } });
   if (!profile?.onboardingCompletedAt || profile.trustReviews.length === 0) return;
   await db.$transaction([
-    db.professionalProfile.update({ where: { id: profile.id }, data: { isPublished: true, verificationStatus: "VERIFIED" } }),
+    db.professionalProfile.update({ where: { id: profile.id }, data: { isPublished: true } }),
     db.auditLog.create({ data: { actorId: user.id, action: "PROFESSIONAL_PROFILE_PUBLISHED", entityType: "ProfessionalProfile", entityId: profile.id } }),
   ]);
   revalidatePath("/workspace/operations/trust");
   revalidatePath("/workspace/talent");
+}
+
+export async function publishCreatorProfile(formData: FormData) {
+  const user = await requireUser();
+  assertReviewer(user.platformRole);
+  const id = z.string().min(1).safeParse(formData.get("creatorProfileId"));
+  if (!id.success) return;
+  const profile = await db.creatorProfile.findUnique({ where: { id: id.data }, include: { trustReviews: { where: { dimension: "PORTFOLIO_SKILLS", status: "APPROVED" } } } });
+  if (!profile?.onboardingCompletedAt || profile.trustReviews.length === 0) return;
+  await db.$transaction([
+    db.creatorProfile.update({ where: { id: profile.id }, data: { isPublished: true } }),
+    db.auditLog.create({ data: { actorId: user.id, action: "CREATOR_PROFILE_PUBLISHED", entityType: "CreatorProfile", entityId: profile.id } }),
+  ]);
+  revalidatePath("/workspace/operations/trust");
+  revalidatePath("/workspace/campaigns");
 }

@@ -120,6 +120,10 @@ export async function reviewMilestone(formData: FormData) {
     }
     await tx.milestone.update({ where: { id: milestone.id }, data: { status: nextStatus, ...(nextStatus === "REVISION_REQUESTED" ? { revisionCount: { increment: 1 } } : {}) } });
     await tx.milestoneEvent.create({ data: { milestoneId: milestone.id, actorId: user.id, fromStatus: "IN_REVIEW", toStatus: nextStatus, note: input.data.note } });
+    if (nextStatus === "APPROVED" && milestone.amount > 0 && milestone.assignedProfile) {
+      const existingObligation = await tx.compensationObligation.findUnique({ where: { milestoneId: milestone.id }, select: { id: true } });
+      if (!existingObligation) await tx.compensationObligation.create({ data: { reference: `MILESTONE-${milestone.id}`, projectId: milestone.project.id, milestoneId: milestone.id, recipientId: milestone.assignedProfile.userId, createdById: user.id, amount: milestone.amount, currency: milestone.currency, provider: "MOCK", simulated: true } });
+    }
     if (nextStatus === "DISPUTED") await tx.dispute.create({ data: { projectId: milestone.project.id, milestoneId: milestone.id, openedById: user.id, issueType: "DELIVERY_REVIEW", description: input.data.note, amountAffected: milestone.amount } });
     await tx.auditLog.create({ data: { actorId: user.id, action: `MILESTONE_${nextStatus}`, entityType: "Milestone", entityId: milestone.id } });
     if (milestone.assignedProfile) await tx.notification.create({ data: { userId: milestone.assignedProfile.userId, title: `Milestone ${nextStatus.replaceAll("_", " ").toLowerCase()}`, body: input.data.note } });
@@ -175,7 +179,16 @@ export async function respondToChangeRequest(formData: FormData) {
   const user = await requireUser();
   const input = z.object({ changeRequestId: z.string().min(1), decision: z.enum(["ACCEPTED", "REJECTED"]), responseNote: z.string().trim().min(4).max(1000) }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return;
-  const change = await db.changeRequest.findUnique({ where: { id: input.data.changeRequestId }, include: { agreement: { include: { terms: true, engagement: { include: { project: { select: { id: true, organisationId: true } }, professional: { select: { userId: true } } } } } } });
+  const change = await db.changeRequest.findUnique({
+    where: { id: input.data.changeRequestId },
+    include: { agreement: { include: {
+      terms: true,
+      engagement: { include: {
+        project: { select: { id: true, organisationId: true } },
+        professional: { select: { userId: true } },
+      } },
+    } } },
+  });
   if (!change || change.status !== "PENDING" || change.createdById === user.id) return;
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: change.agreement.engagement.project.organisationId, userId: user.id } } });
   const isTalent = change.agreement.engagement.professional.userId === user.id;

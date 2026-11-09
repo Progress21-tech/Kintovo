@@ -3,9 +3,11 @@
 import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { sendAccountEmail } from "@/server/email";
+import { consumeRateLimit, rateLimitKey } from "@/server/rate-limit";
 
 const accountSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -34,6 +36,13 @@ export async function registerAccount(_state: { error?: string; success?: string
     location: formData.get("location") ?? undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again." };
+  const requestHeaders = await headers();
+  const ip = (requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || requestHeaders.get("x-real-ip") || "unknown").slice(0, 100);
+  const allowed = await Promise.all([
+    consumeRateLimit(rateLimitKey("register-email", parsed.data.email), 5, 60 * 60),
+    consumeRateLimit(rateLimitKey("register-ip", ip), 20, 60 * 60),
+  ]);
+  if (!allowed.every(Boolean)) return { error: "Too many account requests. Try again later." };
   if (parsed.data.context === "BUSINESS" && !parsed.data.organisation) return { error: "Enter your organisation name." };
   if (process.env.NODE_ENV === "production" && (!process.env.SMTP_HOST || !process.env.EMAIL_FROM)) return { error: "Account verification email is not configured yet." };
 

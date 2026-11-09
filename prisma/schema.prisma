@@ -26,6 +26,9 @@ enum DisputeStatus { OPEN AWAITING_EVIDENCE UNDER_REVIEW AWAITING_RESPONSE RESOL
 enum ChangeRequestStatus { PENDING ACCEPTED REJECTED WITHDRAWN }
 enum CampaignStatus { DRAFT INVITING ACTIVE PAUSED COMPLETED CANCELLED }
 enum CompensationStatus { PENDING SIMULATED_PAID PROVIDER_CONFIRMED_PAID FAILED REFUNDED DISPUTED }
+enum CampaignCreatorStatus { INVITED ACCEPTED DECLINED ACTIVE COMPLETED CANCELLED }
+enum CampaignContentStatus { DRAFT SUBMITTED REVISION_REQUESTED APPROVED PUBLISHED REJECTED }
+enum CampaignAttributionStatus { PENDING APPROVED REJECTED }
 
 model User {
   id              String       @id @default(cuid())
@@ -55,6 +58,9 @@ model User {
   agreementsTalentAccepted Agreement[] @relation("AgreementTalentAcceptance")
   shortlistsCreated TalentShortlist[] @relation("ShortlistCreator")
   projectReviews ProjectReview[]
+  campaignsCreated Campaign[]
+  paymentObligationsCreated CompensationObligation[] @relation("ObligationCreator")
+  paymentObligationsReceived CompensationObligation[] @relation("ObligationRecipient")
 }
 
 model Organisation {
@@ -70,6 +76,7 @@ model Organisation {
   memberships OrganisationMembership[]
   projects    Project[]
   invitations OrganisationInvitation[]
+  campaigns   Campaign[]
 }
 
 model OrganisationInvitation {
@@ -148,6 +155,7 @@ model CreatorProfile {
   verificationStatus VerificationStatus @default(NOT_STARTED)
   isPublished        Boolean            @default(false)
   trustReviews       TrustReview[]
+  campaigns          CampaignCreator[]
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -189,6 +197,7 @@ model Project {
   changeRequests ChangeRequest[]
   disputes       Dispute[]
   reviews        ProjectReview[]
+  compensationObligations CompensationObligation[]
   @@index([organisationId, status, updatedAt])
 }
 
@@ -340,6 +349,7 @@ model Milestone {
   project            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignedProfile    ProfessionalProfile? @relation(fields: [assignedProfileId], references: [id])
   sourceAgreement    Agreement?          @relation(fields: [sourceAgreementId], references: [id])
+  compensationObligation CompensationObligation?
   submissions        Submission[]
   events             MilestoneEvent[]
   disputes           Dispute[]
@@ -510,34 +520,123 @@ model ProjectReview {
 }
 
 model Campaign {
-  id        String         @id @default(cuid())
-  title     String
-  status    CampaignStatus @default(DRAFT)
-  createdAt DateTime       @default(now())
-  creators  CampaignCreator[]
+  id             String         @id @default(cuid())
+  organisationId String?
+  createdById    String
+  title          String
+  brief          String
+  platforms      String[]       @default([])
+  contentTypes   String[]       @default([])
+  usageRights    String?
+  landingUrl     String?
+  currency       String         @default("NGN")
+  status         CampaignStatus @default(DRAFT)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  createdBy      User           @relation(fields: [createdById], references: [id])
+  organisation   Organisation?  @relation(fields: [organisationId], references: [id], onDelete: SetNull)
+  creators       CampaignCreator[]
+  @@index([status, createdAt])
 }
 
 model CampaignCreator {
-  id          String   @id @default(cuid())
-  campaignId  String
-  creatorId   String
-  fixedFee    Int      @default(0)
-  bonusTerms  String?
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  id                 String                @id @default(cuid())
+  campaignId         String
+  creatorId          String
+  status             CampaignCreatorStatus @default(INVITED)
+  fixedFee           Int                   @default(0)
+  bonusRate          Int                   @default(0)
+  bonusCap           Int?
+  bonusTerms         String?
+  contractTerms      String?
+  contractAcceptedAt DateTime?
+  referralCode       String                @unique @default(cuid())
+  invitedAt          DateTime              @default(now())
+  acceptedAt         DateTime?
+  completedAt        DateTime?
+  campaign           Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator            CreatorProfile        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  content            CampaignContent[]
+  attributions       CampaignAttribution[]
+  clicks             CampaignClick[]
+  fixedObligation    CompensationObligation?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
   @@unique([campaignId, creatorId])
+  @@index([creatorId, status])
+}
+
+model CampaignContent {
+  id                 String               @id @default(cuid())
+  campaignCreatorId  String
+  title              String
+  submissionUrl      String?
+  note               String
+  status             CampaignContentStatus @default(SUBMITTED)
+  reviewerId         String?
+  reviewerNote       String?
+  submittedAt        DateTime             @default(now())
+  reviewedAt         DateTime?
+  publishedUrl       String?
+  publishedAt        DateTime?
+  campaignCreator    CampaignCreator      @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  @@index([status, submittedAt])
+}
+
+model CampaignAttribution {
+  id                String                  @id @default(cuid())
+  campaignCreatorId String
+  sourceEventId     String?                 @unique
+  orderReference    String?
+  amount            Int                     @default(0)
+  currency          String                  @default("NGN")
+  status            CampaignAttributionStatus @default(PENDING)
+  occurredAt        DateTime                @default(now())
+  reviewedAt        DateTime?
+  reviewerId        String?
+  reviewerNote      String?
+  bonusAmount       Int                     @default(0)
+  campaignCreator   CampaignCreator         @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  bonusObligation   CompensationObligation?
+  @@index([campaignCreatorId, status, occurredAt])
+}
+
+model CampaignClick {
+  id                String          @id @default(cuid())
+  campaignCreatorId String
+  sourceEventId     String          @unique
+  occurredAt        DateTime        @default(now())
+  campaignCreator   CampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  @@index([campaignCreatorId, occurredAt])
 }
 
 model CompensationObligation {
-  id           String             @id @default(cuid())
-  reference    String             @unique
-  amount       Int
-  currency     String
-  status       CompensationStatus @default(PENDING)
-  provider     String             @default("MOCK")
-  simulated    Boolean            @default(true)
-  createdAt    DateTime           @default(now())
+  id            String             @id @default(cuid())
+  reference     String             @unique
+  projectId     String?
+  milestoneId   String?            @unique
+  campaignCreatorId String?        @unique
+  attributionId String?            @unique
+  recipientId   String?
+  createdById   String?
+  amount        Int
+  currency      String
+  status        CompensationStatus @default(PENDING)
+  provider      String             @default("MOCK")
+  simulated     Boolean            @default(true)
+  paidAt        DateTime?
+  failureReason String?
+  createdAt     DateTime           @default(now())
+  creator       User?              @relation("ObligationCreator", fields: [createdById], references: [id])
+  recipient     User?              @relation("ObligationRecipient", fields: [recipientId], references: [id])
+  project       Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  milestone     Milestone?         @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  campaignCreator CampaignCreator? @relation(fields: [campaignCreatorId], references: [id])
+  attribution   CampaignAttribution? @relation(fields: [attributionId], references: [id])
   ledgerEntries LedgerEntry[]
+  @@index([status, createdAt])
 }
 
 model LedgerEntry {
@@ -550,7 +649,29 @@ model LedgerEntry {
   providerEventId String?
   obligation    CompensationObligation @relation(fields: [obligationId], references: [id])
   createdAt     DateTime              @default(now())
+  @@unique([obligationId, kind, providerEventId])
   @@index([obligationId, createdAt])
+}
+
+model PaymentWebhookEvent {
+  id             String   @id @default(cuid())
+  provider       String
+  eventId        String
+  eventType      String
+  payloadHash    String
+  processedAt    DateTime?
+  processingNote String?
+  receivedAt     DateTime @default(now())
+  @@unique([provider, eventId])
+  @@index([processedAt, receivedAt])
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       Json
+  updatedById String
+  updatedAt   DateTime @updatedAt
+  @@index([updatedAt])
 }
 
 model Notification {
@@ -561,6 +682,7 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, readAt, createdAt])
 }
 
 model AuditLog {
@@ -581,4 +703,12 @@ model VerificationToken {
   purpose    String
   expires    DateTime
   @@index([identifier, purpose])
+}
+
+model RateLimitBucket {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime
+  expiresAt   DateTime
+  @@index([expiresAt])
 }

@@ -1,0 +1,18 @@
+import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/PageHeader";
+import { requireUser } from "@/server/access";
+import { db } from "@/server/db";
+import { reviewManualAttribution } from "@/app/workspace/campaigns/actions";
+
+export default async function CampaignOperationsPage() {
+  const user = await requireUser();
+  if (!["ADMIN", "OPERATIONS", "FINANCE"].includes(user.platformRole)) redirect("/workspace");
+  const [pending, campaigns] = await Promise.all([
+    db.campaignAttribution.findMany({ where: { status: "PENDING" }, include: { campaignCreator: { include: { creator: { include: { user: { select: { name: true } } } }, campaign: { select: { id: true, title: true, currency: true } } } } }, orderBy: { occurredAt: "asc" }, take: 200 }),
+    db.campaign.findMany({ include: { creators: { include: { attributions: true, _count: { select: { clicks: true } } } }, _count: { select: { creators: true } } }, orderBy: { createdAt: "desc" }, take: 100 }),
+  ]);
+  return <main className="app-main"><PageHeader eyebrow="Operations · Campaigns" title="Creator campaign review" description="Review manually submitted attribution records before including them in bonus calculations. These are evidence claims, not provider-confirmed conversions." />
+    <section className="review-list"><h2 className="section-subhead">Attribution review queue</h2>{pending.length ? pending.map((item) => <article className="panel review-card" key={item.id}><div className="panel-header"><div><h2>{item.campaignCreator.campaign.title}</h2><span className="field-note">{item.campaignCreator.creator.user.name} · {item.sourceEventId} · {item.status}</span></div><span className="status-pill amber">Manual record</span></div><div className="panel-content"><p>{item.orderReference || "No order reference"} · {item.currency} {item.amount.toLocaleString("en-NG")} · {item.occurredAt.toLocaleString("en-NG")}</p><form action={reviewManualAttribution} className="review-decision-form"><input type="hidden" name="attributionId" value={item.id} /><label>Review note<textarea name="reviewerNote" minLength={4} maxLength={1000} required /></label><div className="form-actions"><button className="button button-secondary" name="decision" value="REJECTED">Reject claim</button><button className="button button-primary" name="decision" value="APPROVED">Approve claim and calculate bonus</button></div></form></div></article>) : <p className="field-note">No manual attribution claims are awaiting review.</p>}</section>
+    <section className="review-list"><h2 className="section-subhead">Campaign performance records</h2>{campaigns.map((campaign) => { const clicks = campaign.creators.reduce((sum, entry) => sum + entry._count.clicks, 0); const conversions = campaign.creators.flatMap((entry) => entry.attributions).filter((item) => item.status === "APPROVED"); const valueByCurrency = Object.groupBy(conversions, (item) => item.currency); return <article className="panel" key={campaign.id}><div className="panel-header"><div><h2>{campaign.title}</h2><span className="field-note">{campaign.status} · {campaign._count.creators} creators</span></div></div><div className="panel-content"><p>{clicks} tracked referral clicks · {conversions.length} reviewed manual conversions · {conversions.reduce((sum, item) => sum + item.bonusAmount, 0).toLocaleString("en-NG")} total bonus records (mixed currencies may apply)</p><p className="field-note">Revenue by currency: {Object.entries(valueByCurrency).map(([currency, items]) => `${currency} ${(items ?? []).reduce((sum, item) => sum + item.amount, 0).toLocaleString("en-NG")}`).join(" · ") || "No reviewed conversions"}</p></div></article>; })}</section>
+  </main>;
+}

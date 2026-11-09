@@ -6,6 +6,21 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
+const settingKeys = ["CAMPAIGNS_ENABLED", "MANUAL_ATTRIBUTION_ENABLED", "NEW_PROJECTS_ENABLED"] as const;
+
+export async function updatePlatformSetting(formData: FormData) {
+  const user = await requireUser();
+  if (user.platformRole !== "ADMIN") redirect("/workspace");
+  const parsed = z.object({ key: z.enum(settingKeys), enabled: z.enum(["true", "false"]) }).safeParse({ key: formData.get("key"), enabled: formData.get("enabled") });
+  if (!parsed.success) return;
+  await db.$transaction([
+    db.platformSetting.upsert({ where: { key: parsed.data.key }, create: { key: parsed.data.key, value: parsed.data.enabled === "true", updatedById: user.id }, update: { value: parsed.data.enabled === "true", updatedById: user.id } }),
+    db.auditLog.create({ data: { actorId: user.id, action: "PLATFORM_SETTING_UPDATED", entityType: "PlatformSetting", entityId: parsed.data.key, metadata: { enabled: parsed.data.enabled === "true" } } }),
+  ]);
+  revalidatePath("/workspace/operations/settings");
+  revalidatePath("/workspace/campaigns");
+}
+
 export async function reviewBrief(formData: FormData) {
   const user = await requireUser();
   if (user.platformRole !== "ADMIN" && user.platformRole !== "OPERATIONS") redirect("/workspace");

@@ -7,6 +7,7 @@ import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
 import { buildScopePlan } from "@/server/scoping";
 import { generateScopePlan, SCOPE_PROMPT_VERSION } from "@/server/scope-service";
+import { platformFlag } from "@/server/settings";
 
 const briefSchema = z.object({
   organisationId: z.string().min(1),
@@ -37,6 +38,7 @@ function parseAmount(value: string | undefined) {
 
 export async function createProjectBrief(_state: { error?: string }, formData: FormData) {
   const user = await requireUser();
+  if (!await platformFlag("NEW_PROJECTS_ENABLED")) return { error: "New project submissions are temporarily paused. Please try again later." };
   const raw = Object.fromEntries(formData.entries());
   const parsed = briefSchema.safeParse({
     ...raw,

@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/server/db";
+import { rateLimitLogin } from "@/server/rate-limit";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
@@ -11,7 +12,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "Email and password",
       credentials: { email: {}, password: {} },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
+        const emailKey = String(credentials?.email ?? "").trim().toLowerCase().slice(0, 320) || "invalid";
+        const forwarded = request.headers.get("x-forwarded-for");
+        const ip = (forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown").slice(0, 100);
+        if (!await rateLimitLogin(emailKey, ip)) return null;
         const parsed = z.object({ email: z.email(), password: z.string().min(1) }).safeParse(credentials);
         if (!parsed.success) return null;
         const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });

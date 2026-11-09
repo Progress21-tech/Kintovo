@@ -16,7 +16,7 @@ export default async function TalentPage({ searchParams }: { searchParams: Promi
   const projects = await db.project.findMany({ where: { organisationId: { in: organisationIds }, status: { notIn: ["CANCELLED", "COMPLETED"] } }, include: { brief: true, workstreams: true }, orderBy: { updatedAt: "desc" }, take: 100 });
   const selectedProject = projects.find((project) => project.id === query.projectId);
   const profiles = await db.professionalProfile.findMany({
-    where: { isPublished: true, verificationStatus: "VERIFIED" },
+    where: { isPublished: true, trustReviews: { some: { dimension: "PORTFOLIO_SKILLS", status: "APPROVED" } } },
     include: { user: { select: { name: true } }, portfolio: { where: { isPublic: true }, take: 4 }, trustReviews: { where: { status: "APPROVED" }, select: { dimension: true } } },
     orderBy: { user: { name: "asc" } },
     take: 200,

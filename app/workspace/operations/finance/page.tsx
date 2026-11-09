@@ -1,0 +1,25 @@
+import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/PageHeader";
+import { requireUser } from "@/server/access";
+import { db } from "@/server/db";
+import { adjustObligation, reconcileLedger, simulateFailure, simulateRefund, simulateSettlement } from "./actions";
+
+export default async function FinanceOperationsPage() {
+  const user = await requireUser();
+  if (!["ADMIN", "FINANCE"].includes(user.platformRole)) redirect("/workspace");
+  const obligations = await db.compensationObligation.findMany({ include: { recipient: { select: { name: true, email: true } }, ledgerEntries: { orderBy: { createdAt: "asc" } } }, orderBy: { createdAt: "desc" }, take: 500 });
+  const pending = obligations.filter((item) => ["PENDING", "FAILED"].includes(item.status));
+  const simulatedSettled = obligations.filter((item) => item.status === "SIMULATED_PAID").reduce((sum, item) => sum + item.amount, 0);
+  const unresolved = obligations.filter((item) => ["PENDING", "FAILED", "DISPUTED"].includes(item.status)).length;
+  return <main className="app-main"><PageHeader eyebrow="Operations · Finance" title="Compensation ledger" description="Review milestone-derived obligations, record simulated outcomes, and reconcile ledger balances. Simulated actions never move funds." action={<span className="status-pill amber">MOCK provider only</span>} />
+    <div className="metric-grid"><article className="metric"><span>Obligations</span><strong>{obligations.length}</strong><small>Recorded in the database</small></article><article className="metric"><span>Unresolved</span><strong>{unresolved}</strong><small>Pending, failed, or disputed</small></article><article className="metric"><span>Simulated paid</span><strong>{simulatedSettled.toLocaleString("en-NG")}</strong><small>In listed record currencies</small></article></div>
+    <form action={reconcileLedger} className="inline-form finance-reconcile"><button className="button button-secondary">Run ledger reconciliation</button><span className="field-note">Checks up to 1,000 obligations and records exceptions in the audit trail.</span></form>
+    <section className="review-list"><h2 className="section-subhead">Obligations</h2>{obligations.length ? obligations.map((item) => <article className="panel" key={item.id}><div className="panel-header"><div><h2>{item.reference}</h2><span className="field-note">{item.recipient?.name ?? "Recipient not recorded"} · {item.projectId ?? "No project"} · {item.provider}</span></div><span className="status-pill">{item.status.replaceAll("_", " ")}{item.simulated ? " · simulated" : ""}</span></div><div className="panel-content"><p><strong>{item.currency} {item.amount.toLocaleString("en-NG")}</strong> · Created {item.createdAt.toLocaleString("en-NG")}</p>{item.failureReason && <p className="field-note">{item.failureReason}</p>}
+      {item.simulated && ["PENDING", "FAILED"].includes(item.status) && <div className="finance-actions"><form action={simulateSettlement}><input type="hidden" name="obligationId" value={item.id} /><button className="button button-primary button-small">Record simulated settlement</button></form><form action={simulateFailure} className="inline-form"><input type="hidden" name="obligationId" value={item.id} /><label>Simulation note<input name="reason" required minLength={4} maxLength={300} defaultValue="Simulated provider failure for reconciliation." /></label><button className="button button-secondary button-small">Record simulated failure</button></form></div>}
+      {item.simulated && ["PENDING", "FAILED"].includes(item.status) && <form action={adjustObligation} className="inline-form"><input type="hidden" name="obligationId" value={item.id} /><label>Adjusted amount<input type="number" name="newAmount" min="0" step="1" defaultValue={item.amount} required /></label><label>Reason<input name="reason" required minLength={8} maxLength={1000} /></label><button className="button button-secondary button-small">Record amount adjustment</button></form>}
+      {item.simulated && item.status === "SIMULATED_PAID" && <form action={simulateRefund} className="inline-form"><input type="hidden" name="obligationId" value={item.id} /><label>Refund reason<input name="reason" required minLength={8} maxLength={1000} /></label><button className="button button-secondary button-small">Record simulated refund</button></form>}
+      <ul className="review-history">{item.ledgerEntries.map((entry) => <li key={entry.id}><div><strong>{entry.kind.replaceAll("_", " ")}</strong><small>{entry.createdAt.toLocaleString("en-NG")} · {entry.providerEventId ?? "No provider event"}</small></div><span>{entry.currency} {entry.amount.toLocaleString("en-NG")}</span></li>)}</ul>
+      </div></article>) : <p className="field-note">Approving a funded project milestone will create a payable record for review.</p>}</section>
+    <p className="legal-note">Paga and Busha remain integration-evaluation candidates. There is no live provider adapter, approval, escrow, or transfer capability in this application.</p>
+  </main>;
+}

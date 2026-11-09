@@ -17,9 +17,9 @@ export async function inviteShortlistedProfessional(formData: FormData) {
   if (!project) return;
   const [membership, profile] = await Promise.all([
     db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } } }),
-    db.professionalProfile.findUnique({ where: { id: input.data.profileId }, select: { id: true, isPublished: true, verificationStatus: true, userId: true } }),
+    db.professionalProfile.findFirst({ where: { id: input.data.profileId, isPublished: true, trustReviews: { some: { dimension: "PORTFOLIO_SKILLS", status: "APPROVED" } } }, select: { id: true, userId: true } }),
   ]);
-  if (!membership || !canManageProjects(membership.role) || !["MATCHING", "ACTIVE"].includes(project.status) || !profile?.isPublished || profile.verificationStatus !== "VERIFIED") return;
+  if (!membership || !canManageProjects(membership.role) || !["MATCHING", "ACTIVE"].includes(project.status) || !profile) return;
   const existing = await db.engagement.findUnique({ where: { projectId_professionalProfileId: { projectId: project.id, professionalProfileId: profile.id } }, select: { id: true } });
   if (existing) return;
   const engagement = await db.$transaction(async (tx) => {

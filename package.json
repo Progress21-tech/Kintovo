@@ -8,7 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test src/server/scoping.test.ts src/server/permissions.test.ts",
+    "test": "tsx --test src/server/scoping.test.ts src/server/permissions.test.ts src/server/campaigns.test.ts src/server/payments.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
