@@ -442,7 +442,7 @@ model Agreement {
   engagement   Engagement      @relation(fields: [engagementId], references: [id], onDelete: Cascade)
   buyerAcceptedBy User?        @relation("AgreementBuyerAcceptance", fields: [buyerAcceptedById], references: [id])
   talentAcceptedBy User?       @relation("AgreementTalentAcceptance", fields: [talentAcceptedById], references: [id])
-  terms        AgreementVersion
+  terms        AgreementVersion? @relation(onDelete: Cascade)
   changeRequests ChangeRequest[]
   milestones   Milestone[]
   @@unique([engagementId, version])
@@ -465,7 +465,7 @@ model AgreementVersion {
   acceptanceCriteria String[] @default([])
   reviewWindowDays Int @default(5)
   sourceProposalId String?
-  agreement   Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  agreement   Agreement @relation(fields: [agreementId], references: [id])
   createdAt   DateTime  @default(now())
 }
 

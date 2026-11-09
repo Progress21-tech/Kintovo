@@ -202,13 +202,13 @@ export async function respondToChangeRequest(formData: FormData) {
       await tx.agreement.create({ data: {
         engagementId: change.agreement.engagementId, version, status: "PENDING_ACCEPTANCE",
         terms: { create: {
-          scope: change.proposedScope, deliverables: change.agreement.terms.deliverables,
-          amount: change.proposedAmount ?? change.agreement.terms.amount, currency: change.agreement.terms.currency,
-          dueAt: change.proposedDeadline ?? change.agreement.terms.dueAt, estimatedStartAt: change.agreement.terms.estimatedStartAt,
-          revisionAllowance: change.agreement.terms.revisionAllowance, revisionTerms: change.agreement.terms.revisionTerms,
-          usageRights: change.agreement.terms.usageRights, assumptions: change.agreement.terms.assumptions,
-          exclusions: change.agreement.terms.exclusions, acceptanceCriteria: change.agreement.terms.acceptanceCriteria,
-          reviewWindowDays: change.agreement.terms.reviewWindowDays,
+          scope: change.proposedScope, deliverables: change.agreement.terms!.deliverables,
+          amount: change.proposedAmount ?? change.agreement.terms!.amount, currency: change.agreement.terms!.currency,
+          dueAt: change.proposedDeadline ?? change.agreement.terms!.dueAt, estimatedStartAt: change.agreement.terms!.estimatedStartAt,
+          revisionAllowance: change.agreement.terms!.revisionAllowance, revisionTerms: change.agreement.terms!.revisionTerms,
+          usageRights: change.agreement.terms!.usageRights, assumptions: change.agreement.terms!.assumptions,
+          exclusions: change.agreement.terms!.exclusions, acceptanceCriteria: change.agreement.terms!.acceptanceCriteria,
+          reviewWindowDays: change.agreement.terms!.reviewWindowDays,
         } },
       } });
       await tx.notification.create({ data: { userId: change.createdById, title: "Change request accepted", body: "The other party agreed to the proposed change. Both parties must now accept the new agreement version." } });
