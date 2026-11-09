@@ -13,6 +13,6 @@ export default async function WorkspaceLayout({ children }: Readonly<{ children:
   ]);
   return <div className="workspace">
     <header className="app-topbar"><div className="app-top-left"><Brand /><span className="org-label">{membership?.organisation.name ?? "Professional workspace"}</span></div><div className="app-top-right"><span className="app-user">{user.name}</span><form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}><button className="signout-button">Sign out</button></form></div></header>
-    <div className="app-frame"><WorkspaceNav business={!!membership} specialist={!!specialist} creator={!!creator} /><div>{children}</div></div>
+    <div className="app-frame"><WorkspaceNav business={!!membership} specialist={!!specialist} creator={!!creator} operations={user.platformRole === "ADMIN" || user.platformRole === "OPERATIONS"} /><div>{children}</div></div>
   </div>;
 }

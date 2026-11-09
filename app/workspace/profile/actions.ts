@@ -13,6 +13,11 @@ const profileInput = z.object({
   skills: z.string().max(1000).optional(),
   languages: z.string().max(500).optional(),
   availability: z.string().trim().max(160).optional(),
+  availabilityStatus: z.enum(["AVAILABLE", "AVAILABLE_FROM", "UNAVAILABLE", "UNSET"]).optional(),
+  availableFrom: z.string().optional(),
+  preferredDuration: z.string().trim().max(120).optional(),
+  preferredArrangement: z.string().trim().max(120).optional(),
+  preferredEngagements: z.string().max(300).optional(),
   rate: z.string().optional(),
   platforms: z.string().max(500).optional(),
   yearsExperience: z.string().optional(),
@@ -41,12 +46,15 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
   const portfolioItems = (parsed.data.portfolio ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
   if (portfolioItems.length > 10) return { error: "Add up to 10 portfolio items." };
   const portfolio = portfolioItems.map((line) => {
-    const [title, url, ...contribution] = line.split("|").map((part) => part.trim());
+    const [title, url, contribution = "", visibility = ""] = line.split("|").map((part) => part.trim());
     if (!title || (url && !z.url().safeParse(url).success)) return null;
-    return { title, url: url || null, contribution: contribution.join(" | ").slice(0, 500) || null };
+    if (visibility && visibility.toLowerCase() !== "public" && visibility.toLowerCase() !== "private") return null;
+    return { title, url: url || null, contribution: contribution.slice(0, 500) || null, isPublic: visibility.toLowerCase() === "public" };
   });
-  if (portfolio.some((item) => item === null)) return { error: "Portfolio lines use: title | https://link | your contribution. The link is optional." };
+  if (portfolio.some((item) => item === null)) return { error: "Portfolio lines use: title | https://link | your contribution | public (visibility and link are optional)." };
   const submit = parsed.data.intent === "SUBMIT";
+  const availableFrom = parsed.data.availableFrom?.trim() ? new Date(`${parsed.data.availableFrom}T12:00:00.000Z`) : undefined;
+  if (availableFrom && Number.isNaN(availableFrom.getTime())) return { error: "Enter a valid availability date." };
   const specialistCategories = splitList(parsed.data.categories);
   if (submit && parsed.data.context === "SPECIALIST" && (!parsed.data.headline?.trim() || !parsed.data.biography?.trim() || specialistCategories.length === 0)) {
     return { error: "Before review, add a headline, a short description, and at least one professional category." };
@@ -64,6 +72,11 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
       skills: splitList(parsed.data.skills),
       languages: splitList(parsed.data.languages),
       availability: parsed.data.availability || null,
+      availabilityStatus: parsed.data.availabilityStatus ?? "UNSET",
+      availableFrom: availableFrom ?? null,
+      preferredDuration: parsed.data.preferredDuration || null,
+      preferredArrangement: parsed.data.preferredArrangement || null,
+      preferredEngagements: splitList(parsed.data.preferredEngagements),
       indicativeRate: rate ?? null,
       yearsExperience: yearsExperience ?? null,
       marketExperience: parsed.data.marketExperience || null,

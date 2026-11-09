@@ -8,6 +8,8 @@ export type ProfileValues = {
   headline?: string | null; biography?: string | null; city?: string | null;
   categories?: string[]; skills?: string[]; languages?: string[]; availability?: string | null;
   indicativeRate?: number | null; yearsExperience?: number | null; marketExperience?: string | null;
+  availabilityStatus?: string | null; availableFrom?: Date | null; preferredDuration?: string | null;
+  preferredArrangement?: string | null; preferredEngagements?: string[];
   platforms?: string[]; creatorCategories?: string[]; audienceEvidence?: string | null;
   audienceSize?: number | null; audienceGeography?: string | null; portfolio?: string;
 };
@@ -40,8 +42,13 @@ export function ProfileForm({ profile, context }: { profile: ProfileValues; cont
           <label>Languages<input name="languages" defaultValue={(profile.languages ?? []).join(", ")} placeholder="English, Yoruba" maxLength={500} /></label>
           <label>Relevant market experience<input name="marketExperience" defaultValue={profile.marketExperience ?? ""} placeholder="Markets or audience groups you know" maxLength={1000} /></label>
           <label>Availability<input name="availability" defaultValue={profile.availability ?? ""} placeholder="e.g. Available for projects from December" maxLength={160} /></label>
+          <label>Availability status<select name="availabilityStatus" defaultValue={profile.availabilityStatus ?? "UNSET"}><option value="UNSET">Not set</option><option value="AVAILABLE">Available</option><option value="AVAILABLE_FROM">Available from a future date</option><option value="UNAVAILABLE">Unavailable</option></select></label>
+          <label>Available from<input type="date" name="availableFrom" defaultValue={profile.availableFrom?.toISOString().slice(0, 10) ?? ""} /></label>
+          <label>Preferred project duration<input name="preferredDuration" defaultValue={profile.preferredDuration ?? ""} placeholder="e.g. 2–4 weeks" maxLength={120} /></label>
+          <label>Preferred working arrangement<input name="preferredArrangement" defaultValue={profile.preferredArrangement ?? ""} placeholder="Remote, hybrid, on-site" maxLength={120} /></label>
+          <label className="span-two">Preferred engagement types<input name="preferredEngagements" defaultValue={(profile.preferredEngagements ?? []).join(", ")} placeholder="Team project, individual engagement" maxLength={300} /></label>
           <label>Indicative rate in NGN<input type="number" name="rate" min="0" step="1" defaultValue={profile.indicativeRate ?? ""} placeholder="Optional" /></label>
-          <label className="span-two">Portfolio items <span className="field-note">One per line: title | https://link | your contribution (link and contribution are optional)</span><textarea name="portfolio" defaultValue={profile.portfolio ?? ""} placeholder={"Nigeria audience research | https://example.com/work | Led interviews and synthesis"} maxLength={5000} /></label>
+          <label className="span-two">Portfolio items <span className="field-note">One per line: title | https://link | your contribution | public. Items remain private unless you add “public”.</span><textarea name="portfolio" defaultValue={profile.portfolio ?? ""} placeholder={"Nigeria audience research | https://example.com/work | Led interviews and synthesis | public"} maxLength={5000} /></label>
         </div>
       </div>
     </>}

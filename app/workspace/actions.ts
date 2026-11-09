@@ -5,7 +5,8 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
-import { suggestWorkstreams } from "@/server/scoping";
+import { buildScopePlan } from "@/server/scoping";
+import { generateScopePlan, SCOPE_PROMPT_VERSION } from "@/server/scope-service";
 
 const briefSchema = z.object({
   organisationId: z.string().min(1),
@@ -25,6 +26,7 @@ const briefSchema = z.object({
   existingResources: z.string().trim().max(1000).optional(),
   additionalInformation: z.string().trim().max(1500).optional(),
   path: z.enum(["TEAM", "INDIVIDUAL", "UNDECIDED"]),
+  aiConsent: z.boolean().default(false),
 });
 
 function parseAmount(value: string | undefined) {
@@ -40,6 +42,7 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
     ...raw,
     budgetMin: String(raw.budgetMin ?? "").trim() || undefined,
     budgetMax: String(raw.budgetMax ?? "").trim() || undefined,
+    aiConsent: raw.aiConsent === "on",
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Review the brief fields and try again." };
   const min = parseAmount(parsed.data.budgetMin);
@@ -53,7 +56,9 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
   if (!membership) return { error: "You do not have access to that organisation." };
   if (!canManageProjects(membership.role)) return { error: "Your organisation role cannot create project briefs. Ask an owner, administrator, or project manager." };
 
-  const workstreams = suggestWorkstreams(parsed.data.objective);
+  const scopeInput = { objective: parsed.data.objective, targetAudience: parsed.data.targetAudience, budgetMin: min, budgetMax: max, deadline };
+  const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION };
+  const workstreams = scopeResult.plan.workstreams;
   const project = await db.$transaction(async (tx) => {
     const created = await tx.project.create({
       data: {
@@ -76,8 +81,22 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
           expectedOutcomes: parsed.data.expectedOutcomes || null,
           existingResources: parsed.data.existingResources || null,
           additionalInformation: parsed.data.additionalInformation || null,
+          scopeQuestions: scopeResult.plan.questions,
+          scopeAssumptions: scopeResult.plan.assumptions,
+          scopeGeneratedBy: scopeResult.source,
+          scopePromptVersion: scopeResult.promptVersion,
         } },
-        workstreams: { create: workstreams.map((stream) => ({ ...stream, capabilities: stream.capabilities })) },
+        workstreams: { create: workstreams.map((stream) => ({
+          name: stream.name,
+          description: stream.description,
+          capabilities: stream.capabilities,
+          recommendedRoles: stream.recommendedRoles,
+          deliverables: stream.deliverables,
+          dependencies: stream.dependencies,
+          assumptions: stream.assumptions,
+          rationale: stream.rationale,
+          source: scopeResult.source,
+        })) },
       },
     });
     await tx.auditLog.create({ data: { actorId: user.id, action: "PROJECT_BRIEF_DRAFT_CREATED", entityType: "Project", entityId: created.id } });
@@ -111,20 +130,38 @@ export async function saveWorkstreamEdits(_state: { error?: string; success?: st
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } } });
   if (!membership || !canManageProjects(membership.role)) return { error: "Your organisation role cannot edit this project plan." };
   if (project.status !== "DRAFT") return { error: "This plan is locked after submission. Request a scope change during review." };
-  const submittedIds = formData.getAll("streamId").map(String);
-  if (submittedIds.length !== project.workstreams.length || submittedIds.some((id) => !project.workstreams.some((stream) => stream.id === id))) {
-    return { error: "The workstream list changed. Refresh the page and try again." };
-  }
-  const updates = project.workstreams.map((stream) => {
-    const name = z.string().trim().min(2).max(120).safeParse(formData.get(`name_${stream.id}`));
-    const description = z.string().trim().min(2).max(1000).safeParse(formData.get(`description_${stream.id}`));
-    if (!name.success || !description.success) return null;
-    return db.workstream.update({ where: { id: stream.id, projectId: project.id }, data: { name: name.data, description: description.data } });
+  const rawPlan = z.string().max(30000).safeParse(formData.get("plan"));
+  if (!rawPlan.success) return { error: "The workstream plan is too large or missing." };
+  let decodedPlan: unknown;
+  try { decodedPlan = JSON.parse(rawPlan.data); } catch { return { error: "The workstream plan could not be read. Refresh the page and try again." }; }
+  const input = z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(2).max(120),
+    description: z.string().trim().min(2).max(1000),
+    capabilities: z.array(z.string().trim().min(2).max(100)).max(12),
+    recommendedRoles: z.array(z.string().trim().min(2).max(100)).max(8),
+    deliverables: z.array(z.string().trim().min(2).max(180)).max(12),
+    dependencies: z.array(z.string().trim().min(2).max(180)).max(8),
+    assumptions: z.array(z.string().trim().min(2).max(300)).max(8),
+    rationale: z.string().trim().max(500).optional(),
+  }).strict()).max(12).safeParse(decodedPlan);
+  if (!input.success) return { error: "Review the workstream details and try again." };
+  const ids = input.data.flatMap((stream) => stream.id ? [stream.id] : []);
+  if (new Set(ids).size !== ids.length || ids.some((id) => !project.workstreams.some((stream) => stream.id === id))) return { error: "The workstream list changed. Refresh the page and try again." };
+  await db.$transaction(async (tx) => {
+    const retainedIds = input.data.flatMap((stream) => stream.id ? [stream.id] : []);
+    if (retainedIds.length) await tx.workstream.deleteMany({ where: { projectId: project.id, id: { notIn: retainedIds } } });
+    else await tx.workstream.deleteMany({ where: { projectId: project.id } });
+    for (const stream of input.data) {
+      const data = {
+        name: stream.name, description: stream.description, capabilities: stream.capabilities,
+        recommendedRoles: stream.recommendedRoles, deliverables: stream.deliverables,
+        dependencies: stream.dependencies, assumptions: stream.assumptions, rationale: stream.rationale || null,
+      };
+      if (stream.id) await tx.workstream.update({ where: { id: stream.id }, data });
+      else await tx.workstream.create({ data: { projectId: project.id, ...data, source: "BUYER_ADDED" } });
+    }
+    await tx.auditLog.create({ data: { actorId: user.id, action: "PROJECT_PLAN_EDITED", entityType: "Project", entityId: project.id } });
   });
-  if (updates.some((update) => update === null)) return { error: "Each workstream needs a name and description." };
-  await db.$transaction([
-    ...updates.filter((update): update is NonNullable<typeof update> => update !== null),
-    db.auditLog.create({ data: { actorId: user.id, action: "PROJECT_PLAN_EDITED", entityType: "Project", entityId: project.id } }),
-  ]);
-  return { success: "Your workstream edits have been saved." };
+  return { success: "Your workstream plan has been saved." };
 }

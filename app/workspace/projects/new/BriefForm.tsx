@@ -37,6 +37,7 @@ export function BriefForm({ organisations }: { organisations: OrganisationOption
         <label className="span-two">Anything else to know?<textarea name="additionalInformation" placeholder="Optional context" maxLength={1500} /></label>
       </div>
     </div>
+    <label className="scope-ai-consent"><input type="checkbox" name="aiConsent" /><span><strong>Use the configured AI planning provider for this draft</strong><small>If enabled by Kintovo, your objective, target audience, budget range, and deadline will be sent to that provider to draft recommendations. Leave unchecked to use Kintovo’s local rules-based suggestions. Do not include personal or confidential information.</small></span></label>
     {state.error && <p className="form-alert" role="alert">{state.error}</p>}
     <div className="form-actions"><button className="button button-primary" disabled={pending}>{pending ? "Saving brief…" : "Save draft and review plan"}</button></div>
   </form>;

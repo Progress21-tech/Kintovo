@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type WorkspaceNavProps = { business: boolean; specialist: boolean; creator: boolean };
+type WorkspaceNavProps = { business: boolean; specialist: boolean; creator: boolean; operations: boolean };
 
-export function WorkspaceNav({ business, specialist, creator }: WorkspaceNavProps) {
+export function WorkspaceNav({ business, specialist, creator, operations }: WorkspaceNavProps) {
   const links = [
     ["◷", "Overview", "/workspace"],
     ...(business ? [["▤", "Project briefs", "/workspace/projects"], ["⌕", "Find talent", "/workspace/talent"], ["↔", "Agreements", "/workspace/agreements"], ["◉", "Payments", "/workspace/payments"]] : []),
-    ...(specialist || creator ? [["✦", "Professional home", "/workspace/professional"]] : []),
+    ...(specialist || creator ? [["✦", "Professional home", "/workspace/professional"], ["✓", "Trust and evidence", "/workspace/profile/trust"], ["◎", "Opportunities", "/workspace/opportunities"]] : []),
+    ...(operations ? [["⚑", "Brief review", "/workspace/operations/briefs"], ["✓", "Trust review", "/workspace/operations/trust"]] : []),
     ["⚙", "Profile", "/workspace/profile"],
     ["♧", "Organisations", "/workspace/organisations"],
   ];

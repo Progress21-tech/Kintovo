@@ -169,6 +169,19 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .workstream { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: white; }
 .workstream strong { display: block; font-size: 11px; }
 .workstream span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+.workstream-editor { display: grid; gap: 12px; min-width: 0; }
+.workstream-editor legend { padding-inline: 5px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.workstream-editor label { display: grid; gap: 5px; color: #454c48; font-size: 11px; font-weight: 700; }
+.workstream-editor input, .workstream-editor textarea { width: 100%; border: 1px solid #d9d4ca; border-radius: 4px; padding: 9px 10px; color: var(--ink); background: white; font: inherit; font-weight: 400; }
+.workstream-editor textarea { min-height: 68px; resize: vertical; }
+.scope-notes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; border-top: 1px solid var(--line); }
+.scope-notes h3 { margin: 0 0 7px; font-size: 12px; }
+.scope-notes ul { display: grid; gap: 6px; margin: 0; padding-left: 18px; color: var(--muted); font-size: 11px; }
+.scope-ai-consent { display: grid; grid-template-columns: 18px minmax(0,1fr); align-items: start; gap: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 13px; background: #fff; }
+.scope-ai-consent input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); }
+.scope-ai-consent strong, .scope-ai-consent small { display: block; }
+.scope-ai-consent strong { font-size: 11px; }
+.scope-ai-consent small { margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; }
 .talent-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
 .talent-card { border: 1px solid var(--line); border-radius: 5px; padding: 18px; background: white; }
 .talent-avatar { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-soft); font-size: 12px; font-weight: 700; }
@@ -218,6 +231,64 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .professional-summary dt { color: var(--muted); font-size: 9px; }
 .professional-summary dd { overflow-wrap: anywhere; margin: 3px 0 0; font-size: 11px; font-weight: 700; }
 .professional-note { display: block; margin-top: 14px; }
+.talent-search-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: end; gap: 12px; margin-bottom: 15px; padding: 16px; }
+.talent-search-form label, .review-decision-form label { display: grid; gap: 5px; color: #454c48; font-size: 11px; font-weight: 700; }
+.talent-search-form input, .talent-search-form select, .review-decision-form textarea { width: 100%; min-height: 40px; border: 1px solid #d9d4ca; border-radius: 4px; padding: 8px 10px; color: var(--ink); background: white; font: inherit; font-size: 12px; }
+.review-decision-form textarea { min-height: 74px; }
+.match-note { margin: 0 0 14px; color: var(--muted); font-size: 11px; }
+.talent-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 12px; }
+.talent-market { margin: 10px 0 0; color: var(--muted); font-size: 10px; }
+.match-explanation { margin-top: 13px; border-top: 1px solid #efede8; padding-top: 11px; }
+.match-explanation strong, .portfolio-links strong { display: block; font-size: 10px; }
+.match-explanation p, .match-explanation li { margin: 4px 0; color: var(--muted); font-size: 10px; }
+.match-explanation ul { margin: 6px 0; padding-left: 16px; }
+.match-explanation details { margin-top: 7px; color: var(--muted); font-size: 10px; }
+.match-explanation summary { cursor: pointer; }
+.portfolio-links { display: grid; gap: 5px; margin-top: 12px; }
+.portfolio-links a { color: var(--blue); font-size: 10px; text-decoration: underline; }
+.shortlist-form { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px; margin-top: 14px; }
+.shortlist-form select { min-width: 0; border: 1px solid var(--line); border-radius: 4px; padding: 7px; font-size: 10px; }
+.shortlist-form .form-alert, .shortlist-form .form-success { grid-column: 1 / -1; font-size: 10px; }
+.review-list { display: grid; gap: 13px; margin-bottom: 26px; }
+.review-list > .field-note { margin: 0; }
+.review-card .panel-content { display: grid; gap: 12px; }
+.review-objective { margin: 0; color: #4d5651; font-size: 12px; white-space: pre-wrap; }
+.review-decision-form { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.section-subhead { margin: 3px 0 0; font-size: 14px; }
+.trust-request-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin-top: 15px; }
+.trust-form { gap: 12px; }
+.trust-limit { display: block; margin-top: 14px; }
+.review-history { display: grid; margin: 0; padding: 0 20px; list-style: none; }
+.review-history li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 12px 0; }
+.review-history li:last-child { border: 0; }
+.review-history strong, .review-history small { display: block; }
+.review-history strong { font-size: 11px; }
+.review-history small { max-width: 650px; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.project-delivery { display: grid; gap: 14px; margin-top: 22px; }
+.project-delivery > .section-subhead { margin-bottom: 2px; }
+.delivery-list, .message-list { display: grid; gap: 10px; }
+.delivery-item { display: flex; justify-content: space-between; align-items: start; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.delivery-item:last-child { border-bottom: 0; }
+.delivery-item p, .milestone-card p, .message-list p { margin: 6px 0; white-space: pre-wrap; }
+.delivery-item small, .message-list small { color: var(--muted); font-size: 11px; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+.task-create-form, .message-form, .milestone-form { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 13px; }
+.milestone-card { border-bottom: 1px solid var(--line); padding: 15px 0; }
+.milestone-card:last-child { border-bottom: 0; }
+.milestone-card ul, .workflow-details ul { padding-left: 20px; color: var(--muted); font-size: 12px; }
+.submission-card { margin: 10px 0; border-left: 3px solid var(--teal); background: #f4f8f5; padding: 10px 12px; font-size: 12px; }
+.submission-card p { margin: 5px 0; }
+.submission-card a { overflow-wrap: anywhere; }
+.message-list { max-height: 350px; overflow-y: auto; margin-bottom: 12px; }
+.message-list article { border-bottom: 1px solid var(--line); padding: 9px 0; }
+.message-list small { display: block; margin-top: 3px; }
+.workflow-details { margin-top: 10px; font-size: 12px; }
+.workflow-details summary { cursor: pointer; color: var(--teal); }
+@media (max-width: 680px) {
+  .delivery-item { flex-direction: column; }
+  .delivery-item > div:last-child { width: 100%; }
+  .inline-form .button { flex: 1; }
+}
 @media (max-width: 900px) {
   .marketing-nav { display: none; }
   .hero { grid-template-columns: 1fr 1fr; gap: 30px; }
@@ -228,6 +299,8 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .aside-card { display: none; }
   .organisation-layout { grid-template-columns: 1fr; }
   .professional-grid { grid-template-columns: 1fr; }
+  .talent-search-form { grid-template-columns: 1fr 1fr; }
+  .trust-request-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
   .wrap { width: min(100% - 32px, 540px); }
@@ -274,9 +347,11 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .form-panel { padding: 16px; }
   .field-grid { grid-template-columns: 1fr; }
   .field-grid .span-two { grid-column: auto; }
+  .scope-notes { grid-template-columns: 1fr; }
   .form-actions { flex-direction: column-reverse; }
   .form-actions .button { width: 100%; }
   .talent-grid { grid-template-columns: 1fr; }
+  .talent-search-form { grid-template-columns: 1fr; }
   .account-context-grid { grid-template-columns: 1fr; }
   .account-context-card { min-height: 86px; }
   .form-actions-split { flex-direction: column; }

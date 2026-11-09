@@ -14,7 +14,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const context: "SPECIALIST" | "CREATOR" = requestedContext === "CREATOR" || (!specialist && !!creator) ? "CREATOR" : "SPECIALIST";
   const profile: ProfileValues = context === "SPECIALIST" ? {
     ...specialist,
-    portfolio: specialist?.portfolio.map((item) => `${item.title} | ${item.url ?? ""} | ${item.contribution ?? ""}`).join("\n"),
+    portfolio: specialist?.portfolio.map((item) => `${item.title} | ${item.url ?? ""} | ${item.contribution ?? ""} | ${item.isPublic ? "public" : "private"}`).join("\n"),
   } : {
     biography: creator?.biography,
     platforms: creator?.platforms,
