@@ -11,8 +11,9 @@ export default async function WorkspaceLayout({ children }: Readonly<{ children:
     db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
     db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
   ]);
+  const workspaceLabel = membership?.organisation.name ?? (creator && !specialist ? "Creator workspace" : specialist ? "Professional workspace" : "Kintovo workspace");
   return <div className="workspace">
-    <header className="app-topbar"><div className="app-top-left"><Brand /><span className="org-label">{membership?.organisation.name ?? "Professional workspace"}</span></div><div className="app-top-right"><span className="app-user">{user.name}</span><form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}><button className="signout-button">Sign out</button></form></div></header>
+    <header className="app-topbar"><div className="app-top-left"><Brand /><span className="org-label">{workspaceLabel}</span></div><div className="app-top-right"><span className="app-user">{user.name}</span><form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}><button className="signout-button">Sign out</button></form></div></header>
     <div className="app-frame"><WorkspaceNav business={!!membership} specialist={!!specialist} creator={!!creator} operations={user.platformRole === "ADMIN" || user.platformRole === "OPERATIONS"} finance={user.platformRole === "ADMIN" || user.platformRole === "FINANCE"} admin={user.platformRole === "ADMIN"} /><div>{children}</div></div>
   </div>;
 }

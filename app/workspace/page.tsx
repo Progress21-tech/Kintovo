@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -23,6 +24,7 @@ export default async function WorkspacePage() {
     where: { userId: user.id }, include: { organisation: true }, orderBy: { createdAt: "asc" },
   });
   const organisationIds = memberships.map((item) => item.organisationId);
+  if (!memberships.length && ["ADMIN", "OPERATIONS", "FINANCE"].includes(user.platformRole)) redirect("/workspace/operations");
   const [projects, specialist, creator, draftCount, reviewCount, activeCount] = await Promise.all([
     organisationIds.length
       ? db.project.findMany({ where: { organisationId: { in: organisationIds } }, include: { brief: true }, orderBy: { updatedAt: "desc" }, take: 6 })
@@ -35,6 +37,11 @@ export default async function WorkspacePage() {
   ]);
 
   const firstName = user.name.trim().split(/\s+/)[0] || "there";
+  const hasBusiness = memberships.length > 0;
+  const hasProfessional = !!specialist;
+  const hasCreator = !!creator;
+  const primaryHref = hasBusiness ? "/workspace/projects/new" : hasCreator ? "/workspace/profile?context=CREATOR" : "/workspace/profile?context=SPECIALIST";
+  const primaryLabel = hasBusiness ? "Start with a goal" : hasCreator ? "Complete creator profile" : "Complete specialist profile";
 
   return <main className="app-main dashboard-main">
     <div className="page-title-row dashboard-heading">
@@ -43,44 +50,54 @@ export default async function WorkspacePage() {
         <h1>Good to see you, {firstName}.</h1>
         <p>Keep your project goals and next steps in view.</p>
       </div>
-      {memberships.length > 0 && <Link className="button button-primary dashboard-create" href="/workspace/projects/new"><span aria-hidden="true">+</span> Start with a goal</Link>}
+      <Link className="button button-primary dashboard-create" href={primaryHref}><span aria-hidden="true">+</span> {primaryLabel}</Link>
     </div>
 
     <section className="account-context-grid" aria-label="Your Kintovo workspaces">
-      <Link className="account-context-card" href="/workspace/organisations">
+      {hasBusiness && <Link className="account-context-card" href="/workspace/organisations">
         <span className="context-card-icon"><BriefcaseBusiness size={17} aria-hidden="true" /> Business</span>
         <strong>{memberships.length ? `${memberships.length} organisation${memberships.length === 1 ? "" : "s"}` : "Set up an organisation"}</strong>
         <small>Briefs, projects, and team access</small>
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
-      </Link>
-      <Link className="account-context-card" href="/workspace/profile?context=SPECIALIST">
+      </Link>}
+      {hasProfessional && <Link className="account-context-card" href="/workspace/professional">
         <span className="context-card-icon"><UserRound size={17} aria-hidden="true" /> Specialist</span>
         <strong>{specialist?.onboardingCompletedAt ? specialist.verificationStatus.replaceAll("_", " ") : "Continue profile"}</strong>
         <small>Skills, experience, availability, and work</small>
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
-      </Link>
-      <Link className="account-context-card" href="/workspace/profile?context=CREATOR">
+      </Link>}
+      {hasCreator && <Link className="account-context-card" href="/workspace/campaigns">
         <span className="context-card-icon"><UsersRound size={17} aria-hidden="true" /> Creator</span>
         <strong>{creator?.onboardingCompletedAt ? creator.verificationStatus.replaceAll("_", " ") : "Continue profile"}</strong>
         <small>Content, channels, and optional audience evidence</small>
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
-      </Link>
+      </Link>}
     </section>
 
-    {!memberships.length && <section className="panel empty-state dashboard-empty">
+    {!hasBusiness && (hasProfessional || hasCreator) && <section className="panel empty-state dashboard-empty">
       <div>
         <span className="empty-icon"><BriefcaseBusiness size={18} aria-hidden="true" /></span>
         <p className="dashboard-empty-kicker">Your next step</p>
-        <h2>{specialist || creator ? "Build your professional presence" : "Set up your business workspace"}</h2>
-        <p>{specialist || creator ? "Your account is ready. Finish a private profile and submit it when you are ready for human review." : "Create an organisation to start a project brief and invite your team."}</p>
+        <h2>{hasCreator && !hasProfessional ? "Build your creator presence" : "Build your professional presence"}</h2>
+        <p>{hasCreator && !hasProfessional ? "Complete your creator profile to receive campaign invitations and keep your content work ready for review." : "Your account is ready. Finish a private profile and submit it when you are ready for human review."}</p>
         <div className="empty-actions">
-          <Link className="button button-primary" href={specialist || creator ? "/workspace/profile" : "/workspace/organisations"}>Continue setup</Link>
-          {(specialist || creator) && <Link className="button button-secondary" href="/workspace/organisations">Add a business</Link>}
+          <Link className="button button-primary" href={hasCreator && !hasProfessional ? "/workspace/profile?context=CREATOR" : "/workspace/profile?context=SPECIALIST"}>Continue setup</Link>
+          <Link className="button button-secondary" href="/workspace/organisations">Add a business</Link>
         </div>
       </div>
     </section>}
 
-    {memberships.length > 0 && <>
+    {!hasBusiness && hasProfessional && <section className="role-dashboard-grid" aria-label="Specialist workspace">
+      <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Specialist work</span><h2>Find the right opportunity</h2><p>Review invitations, compare proposals, and keep your professional profile ready for matching.</p><div className="empty-actions"><Link className="button button-primary button-small" href="/workspace/opportunities">View opportunities</Link><Link className="button button-secondary button-small" href="/workspace/profile/trust">Manage evidence</Link></div></div></article>
+      <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Profile readiness</span><h2>{specialist?.onboardingCompletedAt ? "Submitted for review" : "Complete your profile"}</h2><p>{specialist?.onboardingCompletedAt ? "Your profile is in the review workflow. Keep your availability and work samples current." : "Add your skills, experience, availability, and public work samples before submitting."}</p><Link className="text-link" href="/workspace/profile?context=SPECIALIST">Open specialist profile <span aria-hidden="true">→</span></Link></div></article>
+    </section>}
+
+    {!hasBusiness && hasCreator && <section className="role-dashboard-grid" aria-label="Creator workspace">
+      <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Creator work</span><h2>Manage campaign opportunities</h2><p>Review invitations, prepare content, and keep track of referral activity and approved conversions.</p><div className="empty-actions"><Link className="button button-primary button-small" href="/workspace/campaigns">Open campaigns</Link><Link className="button button-secondary button-small" href="/workspace/opportunities">View opportunities</Link></div></div></article>
+      <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Profile readiness</span><h2>{creator?.onboardingCompletedAt ? "Submitted for review" : "Complete your creator profile"}</h2><p>{creator?.onboardingCompletedAt ? "Your creator profile is in the review workflow. Keep channels and audience context current." : "Add your content categories, platforms, and optional audience evidence before submitting."}</p><Link className="text-link" href="/workspace/profile?context=CREATOR">Open creator profile <span aria-hidden="true">→</span></Link></div></article>
+    </section>}
+
+    {hasBusiness && <>
       <section className="dashboard-metrics" aria-label="Project brief summary">
         <div className="dashboard-section-heading"><div><span className="welcome-label">At a glance</span><h2>Project briefs</h2></div><span className="dashboard-updated">Across your organisations</span></div>
         <div className="metric-grid">

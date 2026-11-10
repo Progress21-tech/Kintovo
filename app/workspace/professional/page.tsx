@@ -27,6 +27,6 @@ export default async function ProfessionalHomePage() {
         <div className="panel-content professional-summary"><h3>Creator and content production</h3><p>{creator.biography || "Add a short description of the content you make."}</p><div className="talent-tags">{creator.contentCategories.map((item) => <span className="chip" key={item}>{item}</span>)}</div><dl><div><dt>Channels</dt><dd>{creator.platforms.length || "Not added"}</dd></div><div><dt>Audience size</dt><dd>{creator.audienceSize?.toLocaleString("en-NG") ?? "Optional"}</dd></div><div><dt>Audience geography</dt><dd>{creator.audienceGeography || "Not added"}</dd></div></dl><Link className="button button-secondary button-small" href="/workspace/profile?context=CREATOR">Edit creator profile</Link></div>
       </Panel>}
     </div>
-    <p className="field-note professional-note">Profile intake and status tracking are active. Opportunity invitations, verification review tools, and creator campaign workflows are not yet implemented.</p>
+    <p className="field-note professional-note">Profile intake, opportunity invitations, evidence review, and creator campaign workflows are available from the workspace navigation. Publication and verification remain subject to human review.</p>
   </main>;
 }

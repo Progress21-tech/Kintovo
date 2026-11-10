@@ -25,8 +25,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   };
   const currentStatus = context === "SPECIALIST" ? specialist?.verificationStatus : creator?.verificationStatus;
   const submittedAt = context === "SPECIALIST" ? specialist?.onboardingCompletedAt : creator?.onboardingCompletedAt;
+  const profileTitle = context === "CREATOR" ? "Creator profile" : "Specialist profile";
+  const profileDescription = context === "CREATOR"
+    ? "Prepare your creator profile for campaign invitations, content work, and human review."
+    : "Prepare your specialist profile for opportunities, project matching, and human review.";
   return <main className="app-main">
-    <PageHeader eyebrow="Your account" title="Professional onboarding" description="Keep your business and professional identities in one account. You can maintain both a specialist profile and a creator profile." />
+    <PageHeader eyebrow="Your account" title={profileTitle} description={profileDescription} />
     <div className="context-tabs" aria-label="Choose profile type">
       <Link className={`context-tab${context === "SPECIALIST" ? " active" : ""}`} aria-current={context === "SPECIALIST" ? "page" : undefined} href="/workspace/profile?context=SPECIALIST">Specialist profile{specialist?.onboardingCompletedAt ? " · submitted" : ""}</Link>
       <Link className={`context-tab${context === "CREATOR" ? " active" : ""}`} aria-current={context === "CREATOR" ? "page" : undefined} href="/workspace/profile?context=CREATOR">Creator profile{creator?.onboardingCompletedAt ? " · submitted" : ""}</Link>

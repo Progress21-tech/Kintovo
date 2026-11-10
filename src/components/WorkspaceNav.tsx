@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   Activity, BadgeCheck, BriefcaseBusiness, Building2, CircleDollarSign,
   ClipboardCheck, FileText, FolderKanban, LayoutDashboard, Megaphone,
-  MessageSquareText, Search, Settings, ShieldCheck, UserRound, UsersRound,
+  MessageSquareText, PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck, UserRound, UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -53,15 +54,18 @@ export function WorkspaceNav({ business, specialist, creator, operations, financ
     { icon: Building2, label: "Organisations", href: "/workspace/organisations" },
   ];
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
 
-  return <nav className="app-sidebar" aria-label="Workspace navigation">
-    <span className="nav-caption">Workspace</span>
-    {links.map(({ icon: Icon, label, href }) => {
-      const active = href === "/workspace" ? pathname === href : pathname.startsWith(href);
-      return <Link aria-current={active ? "page" : undefined} className={`side-link${active ? " active" : ""}`} key={href} href={href}>
-        <Icon aria-hidden="true" size={16} strokeWidth={1.8} />{label}
-      </Link>;
-    })}
-    <div className="sidebar-bottom">Kintovo <span aria-hidden="true">·</span> Nigeria first<br />Draft platform foundation</div>
-  </nav>;
+  return <aside className={`app-sidebar-shell${collapsed ? " collapsed" : ""}`}>
+    <nav className="app-sidebar" aria-label="Workspace navigation">
+      <div className="sidebar-heading"><span className="nav-caption">Workspace</span><button className="sidebar-toggle" type="button" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}</button></div>
+      {links.map(({ icon: Icon, label, href }) => {
+        const active = href === "/workspace" ? pathname === href : pathname.startsWith(href);
+        return <Link aria-current={active ? "page" : undefined} className={`side-link${active ? " active" : ""}`} key={href} href={href} title={collapsed ? label : undefined}>
+          <Icon className="side-link-icon" aria-hidden="true" size={16} strokeWidth={1.8} /><span>{label}</span>
+        </Link>;
+      })}
+      <div className="sidebar-bottom">Kintovo <span aria-hidden="true">·</span> Nigeria first<br />Draft platform foundation</div>
+    </nav>
+  </aside>;
 }
