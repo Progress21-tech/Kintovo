@@ -42,8 +42,12 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .button-primary:hover:not(:disabled) { background: #ce4d34; }
 .button-secondary { border-color: var(--line); color: var(--ink); background: var(--surface); }
 .button-secondary:hover { border-color: #c8c1b5; }
+.button-danger { border-color: var(--danger); color: var(--danger); background: #fff; }
+.button-danger:hover:not(:disabled) { color: #fff; background: var(--danger); }
 .button-small { min-height: 38px; padding-inline: 14px; font-size: 12px; }
 .button-wide { width: 100%; }
+.project-delete-action { display: grid; gap: 8px; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.project-delete-action p { margin: 0; }
 .google-mark { width: 18px; height: 18px; flex: 0 0 18px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
 .eyebrow::before { width: 22px; height: 1px; background: var(--accent); content: ""; }

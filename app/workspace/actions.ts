@@ -211,6 +211,24 @@ export async function submitBriefForReview(formData: FormData) {
   redirect(`/workspace/projects/${project.id}?submitted=1`);
 }
 
+export async function deleteProjectBrief(formData: FormData) {
+  const user = await requireUser();
+  const projectId = z.string().min(1).safeParse(formData.get("projectId"));
+  if (!projectId.success) redirect("/workspace/projects");
+  const project = await db.project.findUnique({ where: { id: projectId.data }, select: { id: true, organisationId: true } });
+  if (!project) redirect("/workspace/projects");
+  const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: project.organisationId, userId: user.id } } });
+  if (!membership || !canManageProjects(membership.role)) redirect("/workspace/projects");
+  const deleted = await db.$transaction(async (tx) => {
+    const result = await tx.project.deleteMany({ where: { id: project.id, organisationId: project.organisationId, status: "DRAFT" } });
+    if (!result.count) return false;
+    await tx.auditLog.create({ data: { actorId: user.id, action: "PROJECT_BRIEF_DRAFT_DELETED", entityType: "Project", entityId: project.id } });
+    return true;
+  });
+  if (!deleted) redirect(`/workspace/projects/${project.id}?delete=locked`);
+  redirect("/workspace/projects?deleted=1");
+}
+
 export async function saveWorkstreamEdits(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const projectId = z.string().min(1).safeParse(formData.get("projectId"));

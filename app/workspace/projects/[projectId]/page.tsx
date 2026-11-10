@@ -8,15 +8,16 @@ import { db } from "@/server/db";
 import { getProjectAccess } from "@/server/project-access";
 import { canApproveSpend } from "@/server/permissions";
 import { PlanEditor } from "./PlanEditor";
+import { DeleteBriefForm } from "./DeleteBriefForm";
 import { ChangeRequestForm, DisputeForm, MessageForm, MilestoneSubmissionForm, TaskCreateForm } from "../DeliveryForms";
 import { completeProject, changeTaskStatus, respondToChangeRequest, reviewMilestone, startMilestone } from "../delivery-actions";
 
 const statusLabels: Record<string, string> = { DRAFT: "Draft", SUBMITTED: "Submitted for review", IN_REVIEW: "In review", MATCHING: "Talent matching", ACTIVE: "Active", COMPLETED: "Completed", CANCELLED: "Cancelled" };
 
-export default async function ProjectBriefPage({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<{ submitted?: string }> }) {
+export default async function ProjectBriefPage({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<{ submitted?: string; delete?: string }> }) {
   const user = await requireUser();
   const { projectId } = await params;
-  const { submitted } = await searchParams;
+  const { submitted, delete: deleteStatus } = await searchParams;
   const access = await getProjectAccess(projectId, user.id);
   if (!access.project || !access.canView) notFound();
   const project = await db.project.findUnique({ where: { id: projectId }, include: {
@@ -39,6 +40,7 @@ export default async function ProjectBriefPage({ params, searchParams }: { param
   return <main className="app-main">
     <PageHeader eyebrow={project.organisation.name} title={project.title} description={`${project.brief.targetMarket} · ${project.path === "TEAM" ? "Team assembly" : project.path === "INDIVIDUAL" ? "Individual hire" : "Plan then decide"}`} action={<span className={`status-pill ${project.status === "SUBMITTED" ? "blue" : project.status === "ACTIVE" ? "green" : project.status === "MATCHING" ? "coral" : ""}`}>{statusLabels[project.status] ?? project.status}</span>} />
     {submitted === "1" && <p className="form-success" role="status" style={{ marginBottom: 18 }}>Your brief was submitted. Operations will review it before matching begins.</p>}
+    {deleteStatus === "locked" && <p className="form-alert" role="alert" style={{ marginBottom: 18 }}>Only draft briefs can be deleted. Submitted briefs are kept for review and audit history.</p>}
     <div className="dashboard-grid project-workspace-grid">
       <div className="project-main-column">
         <section className="panel"><div className="panel-header"><h2>Business objective</h2><span className="mini-label">Saved brief</span></div><div className="panel-content"><p className="review-objective">{project.brief.objective}</p><div className="field-grid"><div><span className="mini-label">Target audience</span><p>{project.brief.targetAudience || "Not provided"}</p></div><div><span className="mini-label">Budget range</span><p>{budget}</p></div><div><span className="mini-label">Deadline</span><p>{project.brief.deadline?.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" }) ?? "Not provided"}</p></div><div><span className="mini-label">Expected outcomes</span><p>{project.brief.expectedOutcomes || "Not provided"}</p></div></div></div></section>
@@ -55,7 +57,7 @@ export default async function ProjectBriefPage({ params, searchParams }: { param
         {project.status === "ACTIVE" && <ProjectDelivery project={project} userId={user.id} canManage={access.canManage} canApprove={canApprove} isTalent={Boolean(access.talentEngagement)} />}
       </div>
       <aside className="project-aside-column">
-        <section className="panel"><div className="panel-header"><h2>Brief workflow</h2></div><div className="panel-content"><p className="field-note">{project.status === "DRAFT" ? "Review the assumptions and edit the workstreams before submission." : project.status === "SUBMITTED" || project.status === "IN_REVIEW" ? "An operations reviewer is checking the brief." : project.status === "MATCHING" ? "Review eligible profiles and invite candidates to propose." : "The project team and agreement are active."}</p>{project.status === "DRAFT" && access.canManage ? <form action={submitBriefForReview}><input type="hidden" name="projectId" value={project.id} /><button className="button button-primary button-wide">Submit for human review</button></form> : null}</div></section>
+        <section className="panel"><div className="panel-header"><h2>Brief workflow</h2></div><div className="panel-content"><p className="field-note">{project.status === "DRAFT" ? "Review the assumptions and edit the workstreams before submission." : project.status === "SUBMITTED" || project.status === "IN_REVIEW" ? "An operations reviewer is checking the brief." : project.status === "MATCHING" ? "Review eligible profiles and invite candidates to propose." : "The project team and agreement are active."}</p>{project.status === "DRAFT" && access.canManage ? <form action={submitBriefForReview}><input type="hidden" name="projectId" value={project.id} /><button className="button button-primary button-wide">Submit for human review</button></form> : null}{access.canManage && project.status === "DRAFT" && <div className="project-delete-action"><p className="field-note">You can permanently remove this draft before submitting it.</p><DeleteBriefForm projectId={project.id} /></div>}{access.canManage && project.status !== "DRAFT" && <p className="legal-note">Submitted briefs are retained for review and audit history.</p>}</div></section>
         <div className="aside-card" style={{ marginTop: 14 }}><h3>About the suggestions</h3><p>Recommendations are a planning draft based on the source shown above. They are not verified facts, hiring decisions, or binding terms. Review and edit them before submitting.</p></div>
       </aside>
     </div>
