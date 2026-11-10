@@ -6,7 +6,7 @@ import { useState } from "react";
 import {
   Activity, BadgeCheck, BriefcaseBusiness, Building2, CircleDollarSign,
   ClipboardCheck, FileText, FolderKanban, LayoutDashboard, Megaphone,
-  MessageSquareText, PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck, UserRound, UsersRound,
+  Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck, UserRound, UsersRound, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -55,17 +55,21 @@ export function WorkspaceNav({ business, specialist, creator, operations, financ
   ];
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  return <aside className={`app-sidebar-shell${collapsed ? " collapsed" : ""}`}>
+  return <>
+    <button className="mobile-nav-toggle" type="button" aria-label="Open workspace navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu size={18} aria-hidden="true" /><span>Menu</span></button>
+    <aside className={`app-sidebar-shell${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
     <nav className="app-sidebar" aria-label="Workspace navigation">
-      <div className="sidebar-heading"><span className="nav-caption">Workspace</span><button className="sidebar-toggle" type="button" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}</button></div>
+      <div className="sidebar-heading"><span className="nav-caption">Workspace</span><div className="sidebar-heading-actions"><button className="sidebar-toggle" type="button" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} onClick={() => setCollapsed((value) => !value)}>{collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />}</button><button className="sidebar-close-mobile" type="button" aria-label="Close workspace navigation" onClick={() => setMobileOpen(false)}><X size={16} aria-hidden="true" /></button></div></div>
       {links.map(({ icon: Icon, label, href }) => {
         const active = href === "/workspace" ? pathname === href : pathname.startsWith(href);
-        return <Link aria-current={active ? "page" : undefined} className={`side-link${active ? " active" : ""}`} key={href} href={href} title={collapsed ? label : undefined}>
+        return <Link aria-current={active ? "page" : undefined} className={`side-link${active ? " active" : ""}`} key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)}>
           <Icon className="side-link-icon" aria-hidden="true" size={16} strokeWidth={1.8} /><span>{label}</span>
         </Link>;
       })}
       <div className="sidebar-bottom">Kintovo <span aria-hidden="true">·</span> Nigeria first<br />Draft platform foundation</div>
     </nav>
-  </aside>;
+    </aside>
+  </>;
 }
