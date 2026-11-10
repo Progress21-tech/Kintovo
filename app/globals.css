@@ -380,7 +380,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .dashboard-section-heading h2 { margin: 3px 0 0; font-family: "Inter Display", "Inter", sans-serif; font-size: 18px; letter-spacing: -.025em; }
 .dashboard-updated { color: var(--muted); font-size: 11px; }
 .dashboard-metrics { margin-bottom: 28px; }
-.metric-grid { gap: 14px; margin-bottom: 0; }
+.metric-grid { gap: 16px; margin-bottom: 0; }
 .metric { position: relative; min-height: 122px; border-radius: 7px; padding: 16px 18px; }
 .metric > span { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; }
 .metric > span svg { color: var(--accent); }
@@ -516,7 +516,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .page-title-row > .button { width: 100%; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .role-dashboard-grid { grid-template-columns: 1fr; }
-  .metric-grid { gap: 7px; }
+  .metric-grid { gap: 12px; }
   .metric { padding: 11px; }
   .metric strong { font-size: 21px; }
   .dashboard-main { padding-top: 26px; }
@@ -529,7 +529,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .dashboard-section-heading { align-items: start; flex-direction: column; gap: 4px; }
   .dashboard-updated { font-size: 10px; }
   .dashboard-metrics { margin-bottom: 22px; }
-  .metric-grid { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+  .metric-grid { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
   .metric { min-height: 106px; padding: 11px 9px; }
   .metric > span { align-items: start; gap: 5px; font-size: 9px; }
   .metric > span svg { width: 14px; height: 14px; flex: 0 0 auto; }
