@@ -196,7 +196,7 @@ export async function reviewManualAttribution(formData: FormData) {
   revalidatePath("/workspace/operations/campaigns");
 }
 
-export async function submitCampaignRating(_state: { error?: string; success?: string }, formData: FormData) {
+export async function submitCampaignRating(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const input = z.object({ campaignCreatorId: z.string().min(1), rating: z.string(), comment: z.string().trim().max(1000) }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: input.error.issues[0]?.message ?? "Select a rating from one to five." };

@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 
 const reviewDelayMs = 24 * 60 * 60 * 1000;
 
-export async function requestWithdrawal(_state: { error?: string; success?: string }, formData: FormData) {
+export async function requestWithdrawal(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({ amount: z.string(), currency: z.enum(["NGN", "USD", "GBP", "EUR"]) }).safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a valid withdrawal amount." };

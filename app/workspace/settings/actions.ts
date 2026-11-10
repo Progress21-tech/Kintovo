@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
-export async function savePersonalSettings(_state: { error?: string; success?: string }, formData: FormData) {
+export async function savePersonalSettings(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({ name: z.string().trim().min(2).max(100), phone: z.string().trim().max(30) }).safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check your contact details." };
@@ -18,7 +18,7 @@ export async function savePersonalSettings(_state: { error?: string; success?: s
   return { success: "Your personal contact details were saved." };
 }
 
-export async function saveOrganisationSettings(_state: { error?: string; success?: string }, formData: FormData) {
+export async function saveOrganisationSettings(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({
     organisationId: z.string().min(1), name: z.string().trim().min(2).max(120),
@@ -37,7 +37,7 @@ export async function saveOrganisationSettings(_state: { error?: string; success
   return { success: "Business workspace details were saved." };
 }
 
-export async function submitComplaint(_state: { error?: string; success?: string }, formData: FormData) {
+export async function submitComplaint(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({ subject: z.string().trim().min(5).max(140), category: z.enum(["ACCOUNT", "PAYMENTS", "PROJECT", "SAFETY", "OTHER"]), description: z.string().trim().min(20).max(4000) }).safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Add a subject and enough detail for the team to review." };

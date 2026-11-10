@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
-export async function submitEngagementRating(_state: { error?: string; success?: string }, formData: FormData) {
+export async function submitEngagementRating(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({ engagementId: z.string().min(1), rating: z.string(), comment: z.string().trim().max(1000) }).safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Select a rating from one to five." };
