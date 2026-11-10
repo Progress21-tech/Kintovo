@@ -8,7 +8,7 @@ Add these under **Vercel → Project → Settings → Environment Variables**, s
 
 ```dotenv
 # Neon: copy the pooled PostgreSQL connection string from the Neon dashboard.
-# Use the production database/branch here. Keep the complete URL private.
+# Use the production database/branch here. Keep the complete URL private
 DATABASE_URL="postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require"
 
 # Neon direct/unpooled connection string, used by Prisma CLI migrations.
