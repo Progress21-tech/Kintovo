@@ -38,6 +38,15 @@ Implemented in code: responsive public positioning pages; business, specialist, 
 
 Not yet verified or production-ready: Node.js installation to generate the Prisma client and validate/build the app; Prisma schema validation and an initial migration; secure object storage, private uploads, and scanning; provider-specific payment adapters, callback verification, fee persistence, and bank payouts; automated database-backed integration and end-to-end tests; production review of rate limits, proxy headers, security, and accessibility; production email, deployment, backups, monitoring, and legal review. Project payment actions are local simulated ledger records and do not hold, recover, or release funds. Manual campaign attribution is not provider-verified. Database client generation, migrations, tests, lint, application build, and runtime behavior have not been verified because Node.js is unavailable on the current system.
 
+## Roles and administration
+
+Kintovo uses two separate permission layers:
+
+- `platformRole` controls staff capabilities across the platform: `USER`, `OPERATIONS`, `FINANCE`, and `ADMIN`.
+- `OrganisationMembership.role` controls access inside one business workspace: `OWNER`, `ADMIN`, `PROJECT_MANAGER`, and `MEMBER`.
+
+Organisation roles never grant platform administration. Platform roles must be assigned through an authorised administrative process, protected by server-side checks, and recorded in the audit log. The Admin console is available only when `user.platformRole === "ADMIN"`; it provides operational links, review queues, access-governance counts, recent accounts, and audit activity. It intentionally does not expose self-service promotion to Admin.
+
 Paga and Busha remain evaluation candidates. Payment records are labelled simulated; this application does not hold funds, promise escrow, or perform live payment operations. The legal pages are drafts and must be reviewed before launch. No customer, revenue, verified-profile, or pilot traction is claimed.
 
 ## Architecture and decisions
