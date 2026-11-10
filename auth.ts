@@ -1,6 +1,8 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { rateLimitLogin } from "@/server/rate-limit";
@@ -27,8 +29,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole };
       },
     }),
+    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })] : []),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider !== "google") return true;
+      const email = user.email?.trim().toLowerCase();
+      if (!email || profile && "email_verified" in profile && profile.email_verified === false) return false;
+      const existing = await db.user.findUnique({ where: { email } });
+      const persisted = existing ?? await db.user.create({
+        data: {
+          name: user.name?.trim() || email.split("@")[0],
+          email,
+          passwordHash: `oauth_google_${randomBytes(32).toString("hex")}`,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      if (existing && !existing.emailVerifiedAt) {
+        await db.user.update({ where: { id: existing.id }, data: { emailVerifiedAt: new Date() } });
+      }
+      user.id = persisted.id;
+      user.name = persisted.name;
+      user.email = persisted.email;
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;

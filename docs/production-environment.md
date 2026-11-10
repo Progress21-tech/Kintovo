@@ -35,6 +35,10 @@ AI_API_BASE_URL=""
 AI_MODEL=""
 AI_API_KEY=""
 
+# Optional Google OAuth
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+
 # Keep live payment operations disabled.
 PAYMENT_MODE="simulated"
 PAYMENT_PROVIDER_NAME="UNCONFIGURED"
@@ -62,6 +66,18 @@ Paste the resulting value directly into Vercel's `AUTH_SECRET` field. Do not pas
 ## SMTP verification checklist
 
 With `REQUIRE_EMAIL_VERIFICATION=true`, users receive a verification email after registration and cannot sign in until they use the link. The registration form fails closed in production when `SMTP_HOST` or `EMAIL_FROM` is missing. Configure all Resend SMTP variables in the deployed environment, then redeploy because Vercel environment changes apply to new deployments. Use a sender address allowed by the verified Resend domain and set `SMTP_USER=resend` and `SMTP_PASSWORD` to the Resend API key.
+
+## Google OAuth
+
+Create a Google OAuth Web application and add this authorised redirect URI:
+
+`https://YOUR-AUTH-URL.vercel.app/api/auth/callback/google`
+
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the same Vercel environment as `AUTH_URL`, then redeploy. Google-verified accounts are treated as email-verified; email/password accounts still require the Kintovo verification email. Google sign-in creates an account without a password, so the user must continue using Google for that account.
+
+## AI scope planning
+
+The project brief AI checkbox is opt-in. Without a configured provider, Kintovo uses the transparent local rules-based planner. To enable an OpenAI-compatible provider, set `AI_PROVIDER="compatible"`, `AI_API_BASE_URL` to the provider's chat-completions endpoint, `AI_MODEL` to an approved model name, and `AI_API_KEY` to a server-only secret. The response must follow the structured workstream format; invalid, unavailable, or timed-out responses automatically use the local fallback.
 
 Create a test account and confirm that the success message instructs the user to verify their email, the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem.
 

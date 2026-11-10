@@ -44,8 +44,8 @@ export default async function WorkspacePage() {
   const hasBusiness = memberships.length > 0;
   const hasProfessional = !!specialist;
   const hasCreator = !!creator;
-  const primaryHref = hasBusiness ? "/workspace/projects/new" : hasCreator ? "/workspace/profile?context=CREATOR" : "/workspace/profile?context=SPECIALIST";
-  const primaryLabel = hasBusiness ? "Start with a goal" : hasCreator ? "Complete creator profile" : "Complete specialist profile";
+  const primaryHref = hasBusiness ? "/workspace/projects/new" : hasCreator ? "/workspace/profile?context=CREATOR" : hasProfessional ? "/workspace/profile?context=SPECIALIST" : "/workspace/organisations";
+  const primaryLabel = hasBusiness ? "Start with a goal" : hasCreator ? "Complete creator profile" : hasProfessional ? "Complete specialist profile" : "Create business workspace";
 
   return <main className="app-main dashboard-main">
     <div className="page-title-row dashboard-heading">
@@ -77,6 +77,16 @@ export default async function WorkspacePage() {
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
       </Link>}
     </section>
+
+    {!hasBusiness && !hasProfessional && !hasCreator && <section className="panel empty-state dashboard-empty">
+      <div>
+        <span className="empty-icon"><BriefcaseBusiness size={18} aria-hidden="true" /></span>
+        <p className="dashboard-empty-kicker">Set up your workspace</p>
+        <h2>Start with a business workspace</h2>
+        <p>Create an organisation to define your goals, plan workstreams, and assemble a project team.</p>
+        <Link className="button button-primary" href="/workspace/organisations">Create organisation</Link>
+      </div>
+    </section>}
 
     {!hasBusiness && (hasProfessional || hasCreator) && <section className="panel empty-state dashboard-empty">
       <div>

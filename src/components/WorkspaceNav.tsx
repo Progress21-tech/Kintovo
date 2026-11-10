@@ -50,7 +50,7 @@ export function WorkspaceNav({ business, specialist, creator, operations, financ
     ...(finance ? [{ icon: CircleDollarSign, label: "Finance operations", href: "/workspace/operations/finance" }] : []),
     ...(finance && !operations ? [{ icon: Megaphone, label: "Campaign review", href: "/workspace/operations/campaigns" }] : []),
     ...(admin ? [{ icon: Settings, label: "Platform settings", href: "/workspace/operations/settings" }] : []),
-    { icon: UserRound, label: "Profile", href: "/workspace/profile" },
+    ...(specialist || creator ? [{ icon: UserRound, label: "Profile", href: "/workspace/profile" }] : []),
     { icon: Building2, label: "Organisations", href: "/workspace/organisations" },
   ];
   const pathname = usePathname();

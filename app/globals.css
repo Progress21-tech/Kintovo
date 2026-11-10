@@ -44,6 +44,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .button-secondary:hover { border-color: #c8c1b5; }
 .button-small { min-height: 38px; padding-inline: 14px; font-size: 12px; }
 .button-wide { width: 100%; }
+.google-mark { width: 18px; height: 18px; flex: 0 0 18px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
 .eyebrow::before { width: 22px; height: 1px; background: var(--accent); content: ""; }
 .hero { display: grid; min-height: 575px; grid-template-columns: 1.04fr .96fr; align-items: center; gap: 64px; padding-block: 72px 80px; }
@@ -193,6 +194,8 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .aside-card li span { display: grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-soft); font-size: 9px; font-weight: 700; }
 .aside-card > .button { width: 100%; margin-top: 18px; }
 .form-actions { display: flex; justify-content: end; gap: 10px; margin-top: 20px; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 4px 0; color: var(--muted); font-size: 11px; }
+.auth-divider::before, .auth-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
 .workstream-list { display: grid; gap: 8px; margin-top: 12px; }
 .workstream { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: white; }
 .workstream strong { display: block; font-size: 11px; }

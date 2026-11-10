@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
@@ -11,6 +12,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     db.professionalProfile.findUnique({ where: { userId: user.id }, include: { portfolio: { orderBy: { createdAt: "asc" } } } }),
     db.creatorProfile.findUnique({ where: { userId: user.id } }),
   ]);
+  if (!specialist && !creator) redirect("/workspace/organisations");
   const context: "SPECIALIST" | "CREATOR" = specialist ? "SPECIALIST" : creator ? "CREATOR" : requestedContext === "CREATOR" ? "CREATOR" : "SPECIALIST";
   const profile: ProfileValues = context === "SPECIALIST" ? {
     ...specialist,
