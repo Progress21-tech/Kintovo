@@ -19,8 +19,8 @@ AUTH_SECRET="GENERATE_A_UNIQUE_RANDOM_SECRET"
 AUTH_URL="https://YOUR_DOMAIN"
 AUTH_TRUST_HOST="true"
 
-# Temporary launch switch. Keep false until SMTP and a verified sending domain are ready.
-REQUIRE_EMAIL_VERIFICATION="false"
+# Users must verify their email before signing in.
+REQUIRE_EMAIL_VERIFICATION="true"
 
 # SMTP provider credentials. Required for production signup and password recovery.
 SMTP_HOST="YOUR_SMTP_HOST"
@@ -61,9 +61,9 @@ Paste the resulting value directly into Vercel's `AUTH_SECRET` field. Do not pas
 
 ## SMTP verification checklist
 
-When `REQUIRE_EMAIL_VERIFICATION=true`, the registration form intentionally fails closed in production when `SMTP_HOST` or `EMAIL_FROM` is missing. Until a verified sending domain is available, set `REQUIRE_EMAIL_VERIFICATION=false`; new users can sign up and sign in, while the verification token workflow remains available for later activation. Configure all SMTP variables in the deployed environment, then redeploy because Vercel environment changes apply to new deployments. Use a sender address allowed by the SMTP provider and, for authenticated SMTP, set `SMTP_USER` and `SMTP_PASSWORD`.
+With `REQUIRE_EMAIL_VERIFICATION=true`, users receive a verification email after registration and cannot sign in until they use the link. The registration form fails closed in production when `SMTP_HOST` or `EMAIL_FROM` is missing. Configure all Resend SMTP variables in the deployed environment, then redeploy because Vercel environment changes apply to new deployments. Use a sender address allowed by the verified Resend domain and set `SMTP_USER=resend` and `SMTP_PASSWORD` to the Resend API key.
 
-When enabling verification, create a test account and confirm that the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem. Existing accounts created while the flag was false will also need verification after the flag is turned on.
+Create a test account and confirm that the success message instructs the user to verify their email, the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem.
 
 ## Before the first production deploy
 
