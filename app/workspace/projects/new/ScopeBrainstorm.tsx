@@ -53,11 +53,12 @@ export function ScopeBrainstorm({ formRef, conversation, onConversationChange, p
         message: prompt,
       });
       if ("error" in response) {
-        setError(response.error);
+        setError(response.error ?? "The scope assistant could not complete that request.");
         return;
       }
       const reply = response.result.reply;
-      onConversationChange([...conversation, { role: "user", content: prompt }, { role: "assistant", content: reply }].slice(-12));
+      const nextConversation: ScopeChatMessage[] = [...conversation, { role: "user", content: prompt }, { role: "assistant", content: reply }].slice(-12);
+      onConversationChange(nextConversation);
       onPlanChange(response.result.plan);
       setMessage("");
     } catch {

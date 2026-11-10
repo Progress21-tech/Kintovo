@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 export default async function AdminPage() {
   const user = await requireUser();
   if (user.platformRole !== "ADMIN") redirect("/workspace");
-  const [accounts, organisations, businessUsers, specialists, creators, verifiedAccounts, disabledAccounts, openReviews, openDisputes, paymentExceptions, recentAudit, recentUsers, roleCounts] = await Promise.all([
+  const [accounts, organisations, businessUsers, specialists, creators, verifiedAccounts, disabledAccounts, projects, openReviews, openDisputes, paymentExceptions, recentAudit, recentUsers, roleCounts] = await Promise.all([
     db.user.count(),
     db.organisation.count(),
     db.organisationMembership.count({ where: { role: "OWNER" } }),

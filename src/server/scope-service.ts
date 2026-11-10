@@ -127,7 +127,7 @@ export async function brainstormScope(input: ScopeInput, conversation: ScopeChat
     ...(currentPlan ? [{ role: "assistant" as const, content: `Current provisional workstream plan:\n${JSON.stringify(currentPlan)}` }] : []),
     { role: "user", content: message },
   ]);
-  if ("error" in result) return result;
+  if (result.error) return { error: result.error };
   const parsed = conversationOutputSchema.safeParse(result.decoded);
   if (!parsed.success) {
     console.error(`[Kintovo scope] prompt=${SCOPE_PROMPT_VERSION} outcome=invalid_brainstorm_response`);
