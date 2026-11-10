@@ -37,6 +37,14 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
   const user = await requireUser();
   const parsed = profileInput.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the profile details and try again." };
+  const [existingSpecialist, existingCreator, businessMembership] = await Promise.all([
+    db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.organisationMembership.findFirst({ where: { userId: user.id }, select: { id: true } }),
+  ]);
+  if (existingSpecialist && parsed.data.context !== "SPECIALIST") return { error: "This account is restricted to the specialist profile." };
+  if (existingCreator && parsed.data.context !== "CREATOR") return { error: "This account is restricted to the creator profile." };
+  if (!existingSpecialist && !existingCreator && businessMembership) return { error: "Business accounts complete onboarding through their organisation and project goal flow." };
   const rate = parsed.data.rate?.trim() ? Number(parsed.data.rate) : undefined;
   if (rate !== undefined && (!Number.isSafeInteger(rate) || rate < 0)) return { error: "Enter a valid whole-number indicative rate." };
   const yearsExperience = parsed.data.yearsExperience?.trim() ? Number(parsed.data.yearsExperience) : undefined;

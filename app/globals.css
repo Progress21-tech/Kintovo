@@ -179,6 +179,10 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .form-section:last-child { border-bottom: 0; padding: 0; margin: 0; }
 .form-section h2 { margin: 0 0 4px; font-size: 15px; }
 .form-section > p { margin: 0 0 17px; color: var(--muted); font-size: 11px; }
+.form-section label, .form-stack label { display: grid; gap: 6px; color: #454c48; font-size: 11px; font-weight: 700; }
+.form-section input:not([type="checkbox"]), .form-section select, .form-section textarea, .form-stack input:not([type="checkbox"]), .form-stack select, .form-stack textarea { width: 100%; min-height: 42px; border: 1px solid #d9d4ca; border-radius: 4px; padding: 9px 10px; color: var(--ink); background: #fff; font: inherit; font-size: 12px; font-weight: 400; }
+.form-section textarea { min-height: 94px; resize: vertical; }
+.form-section input:focus, .form-section select:focus, .form-section textarea:focus, .form-stack input:focus, .form-stack select:focus, .form-stack textarea:focus { outline: 2px solid rgba(228,90,61,.25); outline-offset: 1px; border-color: var(--accent); }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .field-grid .span-two { grid-column: 1 / -1; }
 .aside-card { border: 1px solid #edcbbf; border-radius: 5px; padding: 19px; background: #fffaf7; }
@@ -230,6 +234,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .context-tabs { display: flex; gap: 8px; margin: -6px 0 16px; border-bottom: 1px solid var(--line); }
 .context-tab { border-bottom: 2px solid transparent; padding: 10px 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .context-tab.active { border-color: var(--accent); color: var(--ink); }
+.profile-context-lock { margin: -4px 0 16px; border-left: 3px solid var(--teal); padding: 9px 12px; color: var(--muted); background: #f2f7f5; font-size: 11px; }
 .profile-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
 .organisation-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, .8fr); align-items: start; gap: 16px; }
 .organisation-list { display: grid; gap: 14px; }
