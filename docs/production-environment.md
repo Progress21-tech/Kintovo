@@ -29,10 +29,10 @@ SMTP_USER="YOUR_SMTP_USERNAME"
 SMTP_PASSWORD="YOUR_SMTP_PASSWORD"
 EMAIL_FROM="Kintovo <hello@YOUR_EMAIL_DOMAIN>"
 
-# Optional AI; keep disabled until configured and reviewed.
-AI_PROVIDER="none"
-AI_API_BASE_URL=""
-AI_MODEL=""
+# Optional AI scope planner (Google AI Studio free tier; add your server-side key).
+AI_PROVIDER="gemini"
+AI_API_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+AI_MODEL="gemini-3.8-flash"
 AI_API_KEY=""
 
 # Optional Google OAuth
@@ -83,7 +83,7 @@ Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the same Vercel environment
 
 ## AI scope planning
 
-The project brief AI checkbox is opt-in. Without a configured provider, Kintovo uses the transparent local rules-based planner and tells the user AI is unavailable. To enable an OpenAI-compatible provider, set `AI_PROVIDER="compatible"`, `AI_API_BASE_URL` to the provider's chat-completions endpoint, `AI_MODEL` to an approved model name, and `AI_API_KEY` to a server-only secret. The response must follow the structured workstream format. If the user opts in but the provider is unavailable, invalid, or times out, the brief is not saved as if it had received AI recommendations; the user sees an error and can retry or choose the rules-based planner.
+The project brief AI checkbox is opt-in. The default provider is Google's OpenAI-compatible Gemini API using `gemini-3.8-flash`; add an API key from Google AI Studio as the server-only `AI_API_KEY` environment variable. The model has a free tier, but Google's free-tier policy may use submitted content to improve products; the form tells users this before consent. Do not send confidential project data on the free tier. Free-tier limits apply, so use an appropriately protected paid tier before processing sensitive production briefs. To use another OpenAI-compatible provider, set `AI_PROVIDER="compatible"`, `AI_API_BASE_URL` to the provider's chat-completions endpoint, `AI_MODEL` to an approved model name, and `AI_API_KEY` to its server-only key. The user can brainstorm about the entered goal in the brief form; the final structured plan is generated from both the full brief and that conversation, then remains editable before submission. If the user opts in but the provider is unavailable, invalid, or times out, the brief is not saved as if it had received AI recommendations; the user sees an error and can retry or choose the rules-based planner.
 
 Create a test account and confirm that the success message instructs the user to verify their email, the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem.
 

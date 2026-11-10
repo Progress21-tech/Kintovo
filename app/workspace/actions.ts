@@ -6,7 +6,7 @@ import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
 import { buildScopePlan } from "@/server/scoping";
-import { generateScopePlan, SCOPE_PROMPT_VERSION } from "@/server/scope-service";
+import { brainstormScope as getScopeBrainstorm, generateScopePlan, isScopeAiConfigured, scopePlanSchema, SCOPE_PROMPT_VERSION, type ScopeChatMessage, type ScopeInput } from "@/server/scope-service";
 import { platformFlag } from "@/server/settings";
 
 const briefSchema = z.object({
@@ -28,6 +28,33 @@ const briefSchema = z.object({
   additionalInformation: z.string().trim().max(1500).optional(),
   path: z.enum(["TEAM", "INDIVIDUAL", "UNDECIDED"]),
   aiConsent: z.boolean().default(false),
+  scopeConversation: z.string().max(30000).optional(),
+  scopeDraftPlan: z.string().max(30000).optional(),
+});
+
+const scopeChatMessagesSchema = z.array(z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1).max(1200),
+})).max(12);
+
+const brainstormRequestSchema = z.object({
+  organisationId: z.string().min(1),
+  objective: z.string().trim().min(8).max(5000),
+  targetMarket: z.string().trim().min(2).max(100),
+  targetAudience: z.string().trim().max(600).optional(),
+  budgetMin: z.number().int().nonnegative().nullable(),
+  budgetMax: z.number().int().nonnegative().nullable(),
+  deadline: z.string().optional(),
+  currentPresence: z.string().trim().max(1000).optional(),
+  currentCapabilities: z.string().trim().max(1000).optional(),
+  previousAttempts: z.string().trim().max(1000).optional(),
+  expectedOutcomes: z.string().trim().max(1000).optional(),
+  constraints: z.string().trim().max(1500).optional(),
+  existingResources: z.string().trim().max(1000).optional(),
+  additionalInformation: z.string().trim().max(1500).optional(),
+  conversation: scopeChatMessagesSchema,
+  currentPlan: scopePlanSchema.nullable(),
+  message: z.string().trim().min(2).max(1200),
 });
 
 function parseAmount(value: string | undefined) {
@@ -58,8 +85,33 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
   if (!membership) return { error: "You do not have access to that organisation." };
   if (!canManageProjects(membership.role)) return { error: "Your organisation role cannot create project briefs. Ask an owner, administrator, or project manager." };
 
-  const scopeInput = { objective: parsed.data.objective, targetAudience: parsed.data.targetAudience, budgetMin: min, budgetMax: max, deadline };
-  const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION, error: undefined };
+  let conversation: ScopeChatMessage[] = [];
+  if (parsed.data.scopeConversation) {
+    try {
+      const parsedConversation = scopeChatMessagesSchema.safeParse(JSON.parse(parsed.data.scopeConversation));
+      if (!parsedConversation.success) return { error: "Your brainstorming notes could not be read. Reopen the planner and try again." };
+      conversation = parsedConversation.data;
+    } catch {
+      return { error: "Your brainstorming notes could not be read. Reopen the planner and try again." };
+    }
+  }
+  let currentPlan: z.infer<typeof scopePlanSchema> | undefined;
+  if (parsed.data.scopeDraftPlan) {
+    try {
+      const parsedPlan = scopePlanSchema.safeParse(JSON.parse(parsed.data.scopeDraftPlan));
+      if (!parsedPlan.success) return { error: "Your brainstorming plan could not be read. Reopen the planner and try again." };
+      currentPlan = parsedPlan.data;
+    } catch {
+      return { error: "Your brainstorming plan could not be read. Reopen the planner and try again." };
+    }
+  }
+  const scopeInput: ScopeInput = {
+    objective: parsed.data.objective, targetMarket: parsed.data.targetMarket, targetAudience: parsed.data.targetAudience, budgetMin: min, budgetMax: max, deadline,
+    currentPresence: parsed.data.currentPresence, currentCapabilities: parsed.data.currentCapabilities,
+    previousAttempts: parsed.data.previousAttempts, expectedOutcomes: parsed.data.expectedOutcomes,
+    constraints: parsed.data.constraints, existingResources: parsed.data.existingResources, additionalInformation: parsed.data.additionalInformation,
+  };
+  const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput, conversation, currentPlan) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION, error: undefined };
   if (!scopeResult.plan) {
     return { error: scopeResult.error === "not_configured"
       ? "AI recommendations are not configured yet, so your brief was not saved. Ask the platform administrator to connect an AI provider, or turn off the AI option to use the clearly labeled rules-based suggestions."
@@ -110,6 +162,36 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
     return created;
   });
   redirect(`/workspace/projects/${project.id}`);
+}
+
+export async function brainstormScopePlan(rawInput: unknown) {
+  if (!await platformFlag("NEW_PROJECTS_ENABLED")) return { error: "New project submissions are temporarily paused." } as const;
+  if (!isScopeAiConfigured()) return { error: "AI planning is not connected yet. The platform administrator needs to configure the AI provider." } as const;
+  const parsed = brainstormRequestSchema.safeParse(rawInput);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the goal details and try again." } as const;
+  const user = await requireUser();
+  const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: parsed.data.organisationId, userId: user.id } } });
+  if (!membership || !canManageProjects(membership.role)) return { error: "You do not have access to plan projects for that organisation." } as const;
+  const deadline = parsed.data.deadline ? new Date(`${parsed.data.deadline}T12:00:00.000Z`) : undefined;
+  if (deadline && Number.isNaN(deadline.getTime())) return { error: "Enter a valid deadline before brainstorming." } as const;
+  const input: ScopeInput = {
+    objective: parsed.data.objective,
+    targetMarket: parsed.data.targetMarket,
+    targetAudience: parsed.data.targetAudience,
+    budgetMin: parsed.data.budgetMin,
+    budgetMax: parsed.data.budgetMax,
+    deadline,
+    currentPresence: parsed.data.currentPresence,
+    currentCapabilities: parsed.data.currentCapabilities,
+    previousAttempts: parsed.data.previousAttempts,
+    expectedOutcomes: parsed.data.expectedOutcomes,
+    constraints: parsed.data.constraints,
+    existingResources: parsed.data.existingResources,
+    additionalInformation: parsed.data.additionalInformation,
+  };
+  const result = await getScopeBrainstorm(input, parsed.data.conversation, parsed.data.message, parsed.data.currentPlan ?? undefined);
+  if ("error" in result) return { error: "The AI could not complete that scope brainstorm. Try again in a moment." } as const;
+  return { result } as const;
 }
 
 export async function submitBriefForReview(formData: FormData) {

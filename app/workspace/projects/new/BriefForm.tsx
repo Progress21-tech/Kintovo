@@ -1,13 +1,21 @@
 "use client";
 
 import { useActionState } from "react";
+import { useRef, useState } from "react";
 import { createProjectBrief } from "@/app/workspace/actions";
+import { ScopeBrainstorm } from "./ScopeBrainstorm";
+import type { ScopeChatMessage } from "@/server/scope-service";
+import type { ScopePlan } from "@/server/scoping";
 
 type OrganisationOption = { id: string; name: string };
 
 export function BriefForm({ organisations, aiConfigured }: { organisations: OrganisationOption[]; aiConfigured: boolean }) {
   const [state, action, pending] = useActionState(createProjectBrief, {});
-  return <form action={action} className="panel form-panel">
+  const formRef = useRef<HTMLFormElement>(null);
+  const [aiConsent, setAiConsent] = useState(false);
+  const [conversation, setConversation] = useState<ScopeChatMessage[]>([]);
+  const [scopeDraftPlan, setScopeDraftPlan] = useState<ScopePlan | null>(null);
+  return <form action={action} className="panel form-panel" ref={formRef}>
     <div className="form-section"><h2>Start with the outcome</h2><p>Tell us what you want to accomplish. This brief is saved as a draft so you can return and refine it.</p>
       <div className="field-grid">
         {organisations.length > 1 ? <label>Organisation<select name="organisationId">{organisations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}</select></label> : <input type="hidden" name="organisationId" value={organisations[0]?.id ?? ""} />}
@@ -37,7 +45,8 @@ export function BriefForm({ organisations, aiConfigured }: { organisations: Orga
         <label className="span-two">Anything else to know?<textarea name="additionalInformation" placeholder="Optional context" maxLength={1500} /></label>
       </div>
     </div>
-    {aiConfigured ? <label className="scope-ai-consent"><input type="checkbox" name="aiConsent" /><span><strong>Request AI-generated workstream recommendations</strong><small>When selected, your objective, target audience, budget range, and deadline will be sent to Kintovo’s configured AI provider to create recommendations for this brief. Leave unchecked for rules-based suggestions. Avoid personal or confidential information.</small></span></label> : <div className="scope-ai-status" role="status"><strong>AI recommendations are not connected</strong><span>This brief will use Kintovo’s rules-based suggestions. A platform administrator must configure an AI provider before you can request AI-generated recommendations.</span></div>}
+    {aiConfigured ? <label className="scope-ai-consent"><input type="checkbox" name="aiConsent" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); if (!event.target.checked) { setConversation([]); setScopeDraftPlan(null); } }} /><span><strong>Use AI for workstream recommendations and brainstorming</strong><small>If selected, your goal, project details, and any brainstorming messages are sent to the configured AI provider. The Google Gemini free tier may use submitted content to improve Google products. Avoid confidential personal or business information. Leave unchecked for local rules-based suggestions.</small></span></label> : <div className="scope-ai-status" role="status"><strong>AI recommendations are not connected</strong><span>This brief will use Kintovo’s rules-based suggestions. Configure the AI provider in Vercel to enable workstream brainstorming.</span></div>}
+    {aiConsent && <><input type="hidden" name="scopeConversation" value={JSON.stringify(conversation)} /><input type="hidden" name="scopeDraftPlan" value={scopeDraftPlan ? JSON.stringify(scopeDraftPlan) : ""} /><ScopeBrainstorm formRef={formRef} conversation={conversation} onConversationChange={setConversation} plan={scopeDraftPlan} onPlanChange={setScopeDraftPlan} /></>}
     {state.error && <p className="form-alert" role="alert">{state.error}</p>}
     <div className="form-actions"><button className="button button-primary" disabled={pending}>{pending ? "Saving brief…" : "Save draft and review plan"}</button></div>
   </form>;
