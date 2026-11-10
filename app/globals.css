@@ -191,6 +191,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .aside-card ol { display: grid; gap: 14px; margin: 19px 0 0; padding: 0; list-style: none; }
 .aside-card li { display: flex; gap: 10px; color: #4f5753; font-size: 11px; }
 .aside-card li span { display: grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-soft); font-size: 9px; font-weight: 700; }
+.aside-card > .button { width: 100%; margin-top: 18px; }
 .form-actions { display: flex; justify-content: end; gap: 10px; margin-top: 20px; }
 .workstream-list { display: grid; gap: 8px; margin-top: 12px; }
 .workstream { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: white; }

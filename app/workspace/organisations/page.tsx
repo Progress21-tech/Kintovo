@@ -28,6 +28,11 @@ export default async function OrganisationsPage({ searchParams }: { searchParams
     },
     orderBy: { createdAt: "asc" },
   });
+  const [professionalProfile, creatorProfile] = await Promise.all([
+    db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+  ]);
+  const isProfessionalAccount = Boolean(professionalProfile || creatorProfile);
 
   return <main className="app-main">
     <PageHeader eyebrow="Business setup" title="Organisations and people" description="Manage the businesses connected to your account and give each member only the access they need." />
@@ -39,7 +44,7 @@ export default async function OrganisationsPage({ searchParams }: { searchParams
 
     <div className="organisation-layout">
       <div className="organisation-list">
-        {memberships.length === 0 && <Panel title="Create your business workspace"><div className="panel-content"><p className="org-intro">Add a business to manage briefs, projects and authorised team members. You can also join a business using an invitation sent to your account email.</p></div></Panel>}
+        {memberships.length === 0 && <Panel title={isProfessionalAccount ? "Join a business workspace" : "Create your business workspace"}><div className="panel-content"><p className="org-intro">{isProfessionalAccount ? "Specialists and creators join businesses by accepting an invitation from a business owner or administrator. Your profile remains separate from the organisation." : "Add a business to manage briefs, projects and authorised team members. You can also join a business using an invitation sent to your account email."}</p></div></Panel>}
         {memberships.map((membership) => <Panel key={membership.organisationId} title={membership.organisation.name} action={<span className="status-pill blue">{membership.role.replaceAll("_", " ")}</span>}>
           <div className="panel-content">
             <p className="org-meta">{[membership.organisation.industry, membership.organisation.location, membership.organisation.website].filter(Boolean).join(" · ") || "Organisation details can be completed as your workspace grows."}</p>
@@ -50,7 +55,7 @@ export default async function OrganisationsPage({ searchParams }: { searchParams
           </div>
         </Panel>)}
       </div>
-      <Panel title="Add an organisation"><div className="panel-content"><CreateOrganisationForm /></div></Panel>
+      {!isProfessionalAccount && <Panel title="Add an organisation"><div className="panel-content"><CreateOrganisationForm /></div></Panel>}
     </div>
   </main>;
 }

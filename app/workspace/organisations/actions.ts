@@ -20,6 +20,11 @@ const organisationSchema = z.object({
 
 export async function createOrganisation(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
+  const [professionalProfile, creatorProfile] = await Promise.all([
+    db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+  ]);
+  if (professionalProfile || creatorProfile) return { error: "Specialist and creator accounts cannot create organisations. A business owner must invite you to join a business." };
   const parsed = organisationSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the organisation details." };
   const organisation = await db.$transaction(async (tx) => {
