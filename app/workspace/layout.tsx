@@ -6,14 +6,15 @@ import { db } from "@/server/db";
 
 export default async function WorkspaceLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await requireUser();
-  const [membership, specialist, creator] = await Promise.all([
+  const [membership, fundingMembership, specialist, creator] = await Promise.all([
     db.organisationMembership.findFirst({ where: { userId: user.id }, include: { organisation: { select: { name: true } } }, orderBy: { createdAt: "asc" } }),
+    db.organisationMembership.findFirst({ where: { userId: user.id, role: { in: ["OWNER", "ADMIN"] } }, select: { id: true } }),
     db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
     db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
   ]);
   const workspaceLabel = membership?.organisation.name ?? (creator && !specialist ? "Creator workspace" : specialist ? "Professional workspace" : "Kintovo workspace");
   return <div className="workspace">
     <header className="app-topbar"><div className="app-top-left"><Brand /><span className="org-label">{workspaceLabel}</span></div><div className="app-top-right"><span className="app-user">{user.name}</span><form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}><button className="signout-button">Sign out</button></form></div></header>
-    <div className="app-frame"><WorkspaceNav business={!!membership} specialist={!!specialist} creator={!!creator} operations={user.platformRole === "ADMIN" || user.platformRole === "OPERATIONS"} finance={user.platformRole === "ADMIN" || user.platformRole === "FINANCE"} admin={user.platformRole === "ADMIN"} /><div>{children}</div></div>
+    <div className="app-frame"><WorkspaceNav business={!!membership} businessFunding={!!fundingMembership} specialist={!!specialist} creator={!!creator} operations={user.platformRole === "ADMIN" || user.platformRole === "OPERATIONS"} finance={user.platformRole === "ADMIN" || user.platformRole === "FINANCE"} admin={user.platformRole === "ADMIN"} /><div>{children}</div></div>
   </div>;
 }

@@ -12,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 
 type WorkspaceNavProps = {
   business: boolean;
+  businessFunding: boolean;
   specialist: boolean;
   creator: boolean;
   operations: boolean;
@@ -21,7 +22,7 @@ type WorkspaceNavProps = {
 
 type NavigationItem = { label: string; href: string; icon: LucideIcon };
 
-export function WorkspaceNav({ business, specialist, creator, operations, finance, admin }: WorkspaceNavProps) {
+export function WorkspaceNav({ business, businessFunding, specialist, creator, operations, finance, admin }: WorkspaceNavProps) {
   const links: NavigationItem[] = [
     { icon: LayoutDashboard, label: "Overview", href: "/workspace" },
     ...(business ? [
@@ -29,6 +30,7 @@ export function WorkspaceNav({ business, specialist, creator, operations, financ
       { icon: Search, label: "Find talent", href: "/workspace/talent" },
       { icon: FileText, label: "Agreements", href: "/workspace/agreements" },
       { icon: CircleDollarSign, label: "Payments", href: "/workspace/payments" },
+      ...(businessFunding ? [{ icon: CircleDollarSign, label: "Add funds", href: "/workspace/funding" }] : []),
     ] : []),
     ...(business || creator ? [{ icon: Megaphone, label: "Campaigns", href: "/workspace/campaigns" }] : []),
     ...(specialist || creator ? [
