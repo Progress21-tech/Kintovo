@@ -65,6 +65,8 @@ With `REQUIRE_EMAIL_VERIFICATION=true`, users receive a verification email after
 
 Create a test account and confirm that the success message instructs the user to verify their email, the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem.
 
+Account emails use a Kintovo-branded HTML layout with a clear action button and retain a plain-text fallback. The visible sender is controlled by `EMAIL_FROM`; the destination domain in verification links is controlled by `AUTH_URL`. Resend may still display security or tracking details around a link, but users will see the branded Kintovo button rather than an unexplained raw URL.
+
 ## Before the first production deploy
 
 The repository currently lacks a committed npm lockfile and initial Prisma migration, and its build has not been run. Use a Node.js 22.18+ environment to install dependencies, generate and review the initial migration against a development database, commit `package-lock.json` and `prisma/migrations/`, and run the project's verification commands. Apply the reviewed migration to the Neon production database with `npm run db:deploy` as a release step, not with `migrate dev`.
