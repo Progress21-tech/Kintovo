@@ -25,6 +25,23 @@ These are source-level checks only. No configured PostgreSQL database, installed
 4. Confirm neither profile is discoverable before evidence approval and publication; approve the evidence and publish each profile; confirm Specialists appear in business talent search and Creators appear as eligible campaign invitees.
 5. Confirm a standard user cannot call review or publication actions successfully.
 
-## Later stages
+## Stage 2 — Admin monitoring and account access controls
 
-Stages 2 onward will be appended here with their implementation, migration, validation, and Git push record.
+### Implemented
+
+- Replaced the generic verified-account metric with separate registered-account, 30-day active-account, business workspace, approved business-goal, completed Specialist/Creator profile, and published talent counts.
+- Added account search and status filters at `/workspace/admin/users`, with profile state and recent activity context.
+- Added audited temporary suspension, restoration, and permanent account ban actions. A ban blocks credentials and Google sign-in and is irreversible from the admin screen. Administrators cannot change their own access.
+- Added individual received-compensation and initiated-obligation totals by currency, plus platform settlement totals by currency and source. Simulated settlements are labelled as simulated.
+- Added a five-minute activity timestamp throttle to avoid writing an activity record on every protected page load.
+- Added a PostgreSQL migration for ban/activity fields and an index supporting active-account queries.
+
+### Design boundary
+
+Permanent bans retain the account and audit record and block that account from signing in. This stage does not delete account data or retain IP addresses/IP hashes for a blacklist. IP addresses can be shared or change over time, and the legal/privacy basis and retention policy for an IP blocklist have not been established. The existing Terms and Privacy pages remain draft notices requiring counsel review.
+
+### Validation and delivery
+
+- `git diff --check` and source-level review are used for this stage.
+- Build, lint, database migration, unit, and browser-flow execution remain unavailable because the checkout has no working Node.js executable, dependencies, or configured database.
+- Code and migration files for this stage will be committed and pushed to `main` before Stage 3 begins.

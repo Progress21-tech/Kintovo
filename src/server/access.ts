@@ -6,8 +6,12 @@ import { redirect } from "next/navigation";
 export async function requireUser() {
   const session = await auth();
   if (!session?.user?.id) redirect("/sign-in");
-  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, platformRole: true, disabledAt: true } });
-  if (!user || user.disabledAt) redirect("/sign-in?notice=account-unavailable");
+  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, platformRole: true, disabledAt: true, bannedAt: true, lastActiveAt: true } });
+  if (!user || user.disabledAt || user.bannedAt) redirect("/sign-in?notice=account-unavailable");
+  const activeCutoff = new Date(Date.now() - 5 * 60 * 1000);
+  if (!user.lastActiveAt || user.lastActiveAt < activeCutoff) {
+    await db.user.updateMany({ where: { id: user.id, OR: [{ lastActiveAt: null }, { lastActiveAt: { lt: activeCutoff } }] }, data: { lastActiveAt: new Date() } });
+  }
   return user;
 }
 

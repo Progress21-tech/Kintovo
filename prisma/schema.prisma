@@ -177,6 +177,9 @@ model User {
   emailVerifiedAt DateTime?
   platformRole    PlatformRole @default(USER)
   disabledAt      DateTime?
+  bannedAt        DateTime?
+  banReason       String?
+  lastActiveAt    DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   memberships     OrganisationMembership[]
@@ -200,6 +203,7 @@ model User {
   campaignsCreated Campaign[]
   paymentObligationsCreated CompensationObligation[] @relation("ObligationCreator")
   paymentObligationsReceived CompensationObligation[] @relation("ObligationRecipient")
+  @@index([lastActiveAt, disabledAt, bannedAt])
 }
 
 model Organisation {

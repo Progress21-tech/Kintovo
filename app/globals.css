@@ -240,6 +240,11 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .admin-link-list strong { font-size: 12px; }
 .admin-link-list span { color: var(--muted); font-size: 10px; line-height: 1.45; }
 .admin-link-list b { position: absolute; top: 17px; right: 2px; color: var(--muted); font-size: 15px; font-weight: 400; }
+.admin-account-actions { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.admin-account-actions .inline-form { align-items: end; }
+.admin-account-actions label { display: grid; min-width: min(100%, 280px); gap: 5px; color: #454c48; font-size: 11px; font-weight: 700; }
+.admin-account-actions input, .admin-account-actions textarea { min-height: 38px; border: 1px solid #d9d4ca; border-radius: 4px; padding: 8px 10px; color: var(--ink); background: white; font: inherit; font-size: 12px; }
+.admin-account-actions textarea { min-height: 74px; }
 @media (max-width: 900px) { .admin-console-grid { grid-template-columns: 1fr; } }
 .workstream-list { display: grid; gap: 8px; margin-top: 12px; }
 .workstream { border: 1px solid var(--line); border-radius: 4px; padding: 12px; background: white; }

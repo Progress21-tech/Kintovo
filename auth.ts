@@ -24,7 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = z.object({ email: z.email().trim(), password: z.string().min(1) }).safeParse(credentials);
         if (!parsed.success) return null;
         const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-        if (!user || user.disabledAt || (requireEmailVerification && !user.emailVerifiedAt)) return null;
+        if (!user || user.disabledAt || user.bannedAt || (requireEmailVerification && !user.emailVerifiedAt)) return null;
         if (!(await bcrypt.compare(parsed.data.password, user.passwordHash))) return null;
         return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole };
       },
@@ -40,6 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = user.email?.trim().toLowerCase();
       if (!email || profile && "email_verified" in profile && profile.email_verified === false) return false;
       const existing = await db.user.findUnique({ where: { email } });
+      if (existing?.disabledAt || existing?.bannedAt) return false;
       const persisted = existing ?? await db.user.create({
         data: {
           name: user.name?.trim() || email.split("@")[0],
