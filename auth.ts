@@ -5,6 +5,8 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { rateLimitLogin } from "@/server/rate-limit";
 
+const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
   pages: { signIn: "/sign-in" },
@@ -20,7 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = z.object({ email: z.email(), password: z.string().min(1) }).safeParse(credentials);
         if (!parsed.success) return null;
         const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-        if (!user || user.disabledAt || !user.emailVerifiedAt) return null;
+        if (!user || user.disabledAt || (requireEmailVerification && !user.emailVerifiedAt)) return null;
         if (!(await bcrypt.compare(parsed.data.password, user.passwordHash))) return null;
         return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole };
       },

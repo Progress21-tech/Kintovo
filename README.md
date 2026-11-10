@@ -17,7 +17,7 @@ Kintovo is a Nigeria-first, curated execution network. This repository contains 
 5. Start the app: `npm run dev`
 6. Visit `http://localhost:3000`.
 
-For local account verification without SMTP, the one-time link is printed in the development server output. Configure SMTP before deploying; production account creation fails closed when email delivery is not configured. Password recovery uses the same mail adapter.
+For local account verification without SMTP, the one-time link is printed in the development server output. Set `REQUIRE_EMAIL_VERIFICATION=false` for an initial launch without a verified sending domain; users can sign up and sign in while the verification workflow remains available. Set it to `true` only after configuring SMTP and a verified sending domain. Password recovery uses the same mail adapter.
 
 To add the fictional local demo account, run `$env:ENABLE_DEMO_SEED="1"; npm run db:seed` in PowerShell after migrations. Login is `buyer@example.test` with `Kintovo-demo-only!2026`. The seed refuses to run with `NODE_ENV=production`; the included profile is explicitly unverified and unpublished. Do not use the demo password outside a local development database.
 
