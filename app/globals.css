@@ -221,6 +221,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .auth-divider::before, .auth-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
 .button-disabled { cursor: not-allowed; opacity: .58; }
 .earnings-metrics { margin-bottom: 20px; }
+.app-main > .earnings-metrics { margin-bottom: 22px; }
 .earnings-withdrawal { margin-bottom: 28px; }
 .earnings-withdrawal p { max-width: 680px; margin: 0 0 16px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .earnings-list { display: grid; gap: 10px; }
