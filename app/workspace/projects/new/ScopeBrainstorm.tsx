@@ -57,7 +57,7 @@ export function ScopeBrainstorm({ formRef, conversation, onConversationChange, p
         return;
       }
       const reply = response.result.reply;
-      const nextConversation: ScopeChatMessage[] = [...conversation, { role: "user", content: prompt }, { role: "assistant", content: reply }].slice(-12);
+      const nextConversation = [...conversation, { role: "user" as const, content: prompt }, { role: "assistant" as const, content: reply }].slice(-12);
       onConversationChange(nextConversation);
       onPlanChange(response.result.plan);
       setMessage("");
