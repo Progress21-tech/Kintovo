@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 export async function requireUser() {
   const session = await auth();
   if (!session?.user?.id) redirect("/sign-in");
-  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, platformRole: true, disabledAt: true, bannedAt: true, lastActiveAt: true } });
+  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, email: true, phone: true, platformRole: true, disabledAt: true, bannedAt: true, lastActiveAt: true } });
   if (!user || user.disabledAt || user.bannedAt) redirect("/sign-in?notice=account-unavailable");
   const activeCutoff = new Date(Date.now() - 5 * 60 * 1000);
   if (!user.lastActiveAt || user.lastActiveAt < activeCutoff) {

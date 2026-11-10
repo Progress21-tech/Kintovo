@@ -45,3 +45,20 @@ Permanent bans retain the account and audit record and block that account from s
 - `git diff --check` and source-level review are used for this stage.
 - Build, lint, database migration, unit, and browser-flow execution remain unavailable because the checkout has no working Node.js executable, dependencies, or configured database.
 - Code and migration files for this stage will be committed and pushed to `main` before Stage 3 begins.
+
+## Stage 3 — Workspace settings and complaint handling
+
+### Implemented
+
+- Added a Settings and support page available from every signed-in workspace.
+- Users can edit their name and phone number and see their verified-account email as read-only. Email changes still require a separate verification workflow.
+- Business owners and administrators can edit their organisation's name, website, industry, business model, product/service, and location. Server-side membership checks prevent other members from changing organisation records.
+- Added general account/project/payment/safety complaints with user-visible status and Operations replies. Operations staff can triage, assign, update status, and notify the reporter; all submissions and decisions are audit-logged.
+- Added queue counts and an Operations complaint queue. Project-specific disputes remain available through existing project workflows.
+- Added a migration for phone number and complaint records.
+
+### Validation and delivery
+
+- Static review and `git diff --check` are used for this stage.
+- The complaint route is restricted to Admin and Operations on both page and action. User settings remain available to signed-in users.
+- Runtime, database migration, automated, and browser testing remain pending the required Node.js runtime and a configured test database.

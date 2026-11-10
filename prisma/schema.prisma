@@ -125,6 +125,13 @@ enum DisputeStatus {
   ESCALATED
   CLOSED
 }
+enum ComplaintStatus {
+  OPEN
+  UNDER_REVIEW
+  AWAITING_RESPONSE
+  RESOLVED
+  CLOSED
+}
 enum ChangeRequestStatus {
   PENDING
   ACCEPTED
@@ -173,6 +180,7 @@ model User {
   id              String       @id @default(cuid())
   name            String
   email           String       @unique
+  phone           String?
   passwordHash    String
   emailVerifiedAt DateTime?
   platformRole    PlatformRole @default(USER)
@@ -203,6 +211,8 @@ model User {
   campaignsCreated Campaign[]
   paymentObligationsCreated CompensationObligation[] @relation("ObligationCreator")
   paymentObligationsReceived CompensationObligation[] @relation("ObligationRecipient")
+  complaints      Complaint[]  @relation("ComplaintReporter")
+  assignedComplaints Complaint[] @relation("ComplaintAssignee")
   @@index([lastActiveAt, disabledAt, bannedAt])
 }
 
@@ -648,6 +658,23 @@ model Dispute {
   milestone      Milestone?    @relation(fields: [milestoneId], references: [id])
   openedBy       User          @relation("DisputeOpener", fields: [openedById], references: [id])
   @@index([projectId, status, createdAt])
+}
+
+model Complaint {
+  id          String          @id @default(cuid())
+  userId      String
+  subject     String
+  category    String
+  description String
+  status      ComplaintStatus @default(OPEN)
+  staffNote   String?
+  assignedToId String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  user        User            @relation("ComplaintReporter", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo  User?           @relation("ComplaintAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 model ProjectReview {

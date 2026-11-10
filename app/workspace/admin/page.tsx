@@ -35,6 +35,7 @@ export default async function AdminPage() {
     { href: "/workspace/operations/trust", title: "Trust review", description: "Review submitted portfolio and market evidence." },
     { href: "/workspace/operations/finance", title: "Financial monitoring", description: "Inspect simulated obligations, settlements, refunds, and exceptions." },
     { href: "/workspace/operations/disputes", title: "Dispute review", description: "Record operational review decisions and resolution notes." },
+    { href: "/workspace/operations/complaints", title: "Support complaints", description: "Review account complaints, record an outcome, and notify the user." },
     { href: "/workspace/operations/briefs", title: "Brief review", description: "Review business objectives before matching begins." },
     { href: "/workspace/reports", title: "Platform reports", description: "Review operational and financial reporting surfaces." },
   ];

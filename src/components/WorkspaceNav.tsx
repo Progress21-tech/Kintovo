@@ -41,6 +41,7 @@ export function WorkspaceNav({ business, businessFunding, specialist, creator, o
       { icon: ClipboardCheck, label: "Assessments", href: "/workspace/profile/assessments" },
     ] : []),
     ...(business || specialist || creator ? [{ icon: Activity, label: "Reports", href: "/workspace/reports" }] : []),
+    { icon: Settings, label: "Settings and support", href: "/workspace/settings" },
     { icon: MessageSquareText, label: "Notifications", href: "/workspace/notifications" },
     ...(operations ? [
       { icon: LayoutDashboard, label: "Operations overview", href: "/workspace/operations" },
@@ -49,6 +50,7 @@ export function WorkspaceNav({ business, businessFunding, specialist, creator, o
       { icon: ClipboardCheck, label: "Assessments", href: "/workspace/operations/assessments" },
       { icon: Megaphone, label: "Campaign review", href: "/workspace/operations/campaigns" },
       { icon: UsersRound, label: "Dispute review", href: "/workspace/operations/disputes" },
+      { icon: MessageSquareText, label: "Support complaints", href: "/workspace/operations/complaints" },
     ] : []),
     ...(finance ? [{ icon: CircleDollarSign, label: "Finance operations", href: "/workspace/operations/finance" }] : []),
     ...(finance && !operations ? [{ icon: Megaphone, label: "Campaign review", href: "/workspace/operations/campaigns" }] : []),
