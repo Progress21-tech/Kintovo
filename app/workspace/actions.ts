@@ -113,9 +113,18 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
   };
   const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput, conversation, currentPlan) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION, error: undefined };
   if (!scopeResult.plan) {
-    return { error: scopeResult.error === "not_configured"
-      ? "AI recommendations are not configured yet, so your brief was not saved. Ask the platform administrator to connect an AI provider, or turn off the AI option to use the clearly labeled rules-based suggestions."
-      : "The AI provider could not generate recommendations, so your brief was not saved. Try again later, or turn off the AI option to use rules-based suggestions." };
+    const reason = scopeResult.error;
+    const reasonMessages = {
+      not_configured: "AI recommendations are not configured, so the brief was not saved. Ask the platform administrator to check the AI settings or turn off AI for rules-based suggestions.",
+      authentication_failed: "The AI provider rejected its API key, so the brief was not saved. Ask the platform administrator to check AI_API_KEY in Vercel.",
+      rate_limited: "The AI provider's quota or rate limit has been reached, so the brief was not saved. Try again later or turn off AI for rules-based suggestions.",
+      invalid_request: "The AI provider rejected the model request, so the brief was not saved. Ask the platform administrator to check the model and API endpoint settings.",
+      invalid_response: "The AI provider returned an unreadable plan, so the brief was not saved. Try again or turn off AI for rules-based suggestions.",
+      provider_unavailable: "The AI provider is temporarily unavailable, so the brief was not saved. Try again later or turn off AI for rules-based suggestions.",
+      timeout: "The AI provider took too long to respond, so the brief was not saved. Try again with shorter details or turn off AI for rules-based suggestions.",
+      provider_failed: "The AI provider could not be reached, so the brief was not saved. Try again later or turn off AI for rules-based suggestions.",
+    };
+    return { error: reason ? reasonMessages[reason] : reasonMessages.provider_failed };
   }
   const scopePlan = scopeResult.plan;
   const workstreams = scopePlan.workstreams;
