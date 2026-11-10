@@ -16,7 +16,7 @@ DIRECT_URL="postgresql://USER:PASSWORD@DIRECT_HOST/DBNAME?sslmode=verify-full"
 
 # Generate a unique random secret. Never reuse the example text.
 AUTH_SECRET="GENERATE_A_UNIQUE_RANDOM_SECRET"
-AUTH_URL="https://YOUR_DOMAIN"
+AUTH_URL="https://YOUR_PROJECT.vercel.app"
 AUTH_TRUST_HOST="true"
 
 # Users must verify their email before signing in.
@@ -27,7 +27,7 @@ SMTP_HOST="YOUR_SMTP_HOST"
 SMTP_PORT="587"
 SMTP_USER="YOUR_SMTP_USERNAME"
 SMTP_PASSWORD="YOUR_SMTP_PASSWORD"
-EMAIL_FROM="Kintovo <no-reply@YOUR_DOMAIN>"
+EMAIL_FROM="Kintovo <hello@YOUR_EMAIL_DOMAIN>"
 
 # Optional AI; keep disabled until configured and reviewed.
 AI_PROVIDER="none"
@@ -65,7 +65,7 @@ With `REQUIRE_EMAIL_VERIFICATION=true`, users receive a verification email after
 
 Create a test account and confirm that the success message instructs the user to verify their email, the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem.
 
-Account emails use a Kintovo-branded HTML layout with a clear action button and retain a plain-text fallback. The visible sender is controlled by `EMAIL_FROM`; the destination domain in verification links is controlled by `AUTH_URL`. Resend may still display security or tracking details around a link, but users will see the branded Kintovo button rather than an unexplained raw URL.
+Account emails use a Kintovo-branded HTML layout with a clear action button and retain a plain-text fallback. The visible sender is controlled by `EMAIL_FROM`; the destination domain in verification links is controlled by `AUTH_URL`. If the app is still hosted on Vercel, use its exact production `.vercel.app` URL for `AUTH_URL`; this is independent from the verified Resend sender domain in `EMAIL_FROM`. Resend may still display security or tracking details around a link, but users will see the branded Kintovo button rather than an unexplained raw URL.
 
 ## Before the first production deploy
 
