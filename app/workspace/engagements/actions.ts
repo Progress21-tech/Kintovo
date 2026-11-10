@@ -52,7 +52,7 @@ const proposalInput = z.object({
   previousProposalId: z.string().optional(),
 });
 
-export async function submitProposal(_state: { error?: string; success?: string }, formData: FormData) {
+export async function submitProposal(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = proposalInput.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Review the proposal terms and try again." };
@@ -93,13 +93,14 @@ export async function submitProposal(_state: { error?: string; success?: string 
   return { success: "Your proposal was sent. The other party can accept, decline, or counter it." };
 }
 
-export async function counterProposal(_state: { error?: string; success?: string }, formData: FormData) {
+export async function counterProposal(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   await requireUser();
   const previousId = z.string().min(1).safeParse(formData.get("previousProposalId"));
   if (!previousId.success) return { error: "The proposal could not be found." };
   const previous = await db.proposal.findUnique({ where: { id: previousId.data }, select: { id: true, engagementId: true } });
   if (!previous) return { error: "The proposal could not be found." };
-  const forwarded = new FormData(formData);
+  const forwarded = new FormData();
+  formData.forEach((value, key) => forwarded.append(key, value));
   forwarded.set("engagementId", previous.engagementId);
   forwarded.set("previousProposalId", previous.id);
   return submitProposal({}, forwarded);

@@ -22,7 +22,7 @@ const accountSchema = z.object({
   location: z.string().trim().max(120).optional(),
 });
 
-export async function registerAccount(_state: { error?: string; success?: string }, formData: FormData) {
+export async function registerAccount(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const parsed = accountSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),

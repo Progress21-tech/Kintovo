@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/server/db";
 
-export async function resetPassword(_state: { error?: string }, formData: FormData) {
+export async function resetPassword(_state: { error?: string }, formData: FormData): Promise<{ error?: string }> {
   const parsed = z.object({ token: z.string().min(20), password: z.string().min(12).max(200) }).safeParse({ token: formData.get("token"), password: formData.get("password") });
   if (!parsed.success) return { error: "Use a valid reset link and a password of at least 12 characters." };
   const hash = createHash("sha256").update(parsed.data.token).digest("hex");

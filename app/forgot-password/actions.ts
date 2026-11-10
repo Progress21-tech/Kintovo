@@ -7,7 +7,7 @@ import { db } from "@/server/db";
 import { sendAccountEmail } from "@/server/email";
 import { consumeRateLimit, rateLimitKey } from "@/server/rate-limit";
 
-export async function requestPasswordReset(_state: { message?: string; error?: string }, formData: FormData) {
+export async function requestPasswordReset(_state: { message?: string; error?: string }, formData: FormData): Promise<{ message?: string; error?: string }> {
   const email = z.email().safeParse(formData.get("email"));
   if (!email.success) return { error: "Enter a valid email address." };
   const normalized = email.data.toLowerCase();

@@ -33,7 +33,7 @@ function splitList(value: string | undefined) {
   return [...new Set((value ?? "").split(",").map((item) => item.trim()).filter(Boolean))].slice(0, 30);
 }
 
-export async function saveProfile(_state: { error?: string; success?: string }, formData: FormData) {
+export async function saveProfile(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = profileInput.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the profile details and try again." };

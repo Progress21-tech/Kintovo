@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
-export async function requestTrustReview(_state: { error?: string; success?: string }, formData: FormData) {
+export async function requestTrustReview(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({
     profileType: z.enum(["SPECIALIST", "CREATOR"]),

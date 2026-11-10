@@ -53,7 +53,7 @@ export async function changeTaskStatus(formData: FormData) {
   refreshProject(task.projectId);
 }
 
-export async function addProjectMessage(_state: { error?: string; success?: string }, formData: FormData) {
+export async function addProjectMessage(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const input = z.object({ projectId: z.string().min(1), body: z.string().trim().min(1).max(3000), taskId: z.string().optional(), parentId: z.string().optional() }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: "Write a message of up to 3,000 characters." };
@@ -87,7 +87,7 @@ export async function startMilestone(formData: FormData) {
   refreshProject(milestone.project.id);
 }
 
-export async function submitMilestone(_state: { error?: string; success?: string }, formData: FormData) {
+export async function submitMilestone(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const input = z.object({ milestoneId: z.string().min(1), note: z.string().trim().min(8).max(2000), evidenceUrl: z.union([z.literal(""), z.url()]).optional() }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: input.error.issues[0]?.message ?? "Add a clear submission note." };
@@ -131,7 +131,7 @@ export async function reviewMilestone(formData: FormData) {
   refreshProject(milestone.project.id);
 }
 
-export async function openProjectDispute(_state: { error?: string; success?: string }, formData: FormData) {
+export async function openProjectDispute(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const input = z.object({ projectId: z.string().min(1), milestoneId: z.string().optional(), issueType: z.string().trim().min(3).max(100), description: z.string().trim().min(20).max(3000), amountAffected: z.string().optional() }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: input.error.issues[0]?.message ?? "Describe the issue for the review record." };
@@ -156,7 +156,7 @@ export async function openProjectDispute(_state: { error?: string; success?: str
   return { success: "The dispute is recorded for operations review. This record does not guarantee recovery or release of funds." };
 }
 
-export async function createChangeRequest(_state: { error?: string; success?: string }, formData: FormData) {
+export async function createChangeRequest(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const input = z.object({ agreementId: z.string().min(1), reason: z.string().trim().min(10).max(1000), proposedScope: z.string().trim().min(20).max(5000), proposedAmount: z.string().optional(), proposedDeadline: z.string().optional() }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return { error: input.error.issues[0]?.message ?? "Describe the proposed scope change." };

@@ -6,7 +6,7 @@ import { acceptAgreement, acceptProposal, declineProposal, inviteShortlistedProf
 export type OfferValues = { id: string; amount: number; currency: string; scope: string; deliverables: string[]; assumptions: string[]; exclusions: string[]; revisionAllowance: number; usageRights: string | null; dependencies: string | null; expenses: string | null; deadline: Date | null; estimatedStartAt: Date | null; authorId: string; version: number; status: string };
 
 export function InviteProfessionalForm({ projectId, profileId }: { projectId: string; profileId: string }) {
-  return <details className="invite-details"><summary>Invite to this project</summary><form action={inviteShortlistedProfessional} className="form-stack invite-details-content"><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="profileId" value={profileId} /><label>Invitation note<textarea name="message" maxLength={1500} placeholder="Share why this opportunity may be relevant and what you would like the professional to review." /></label><button className="button button-primary button-small">Send project invitation</button></form></details>;
+  return <details className="invite-details"><summary>Invite to this project</summary><form action={async (formData) => { await inviteShortlistedProfessional(formData); }} className="form-stack invite-details-content"><input type="hidden" name="projectId" value={projectId} /><input type="hidden" name="profileId" value={profileId} /><label>Invitation note<textarea name="message" maxLength={1500} placeholder="Share why this opportunity may be relevant and what you would like the professional to review." /></label><button className="button button-primary button-small">Send project invitation</button></form></details>;
 }
 
 export function ProposalForm({ engagementId, previous }: { engagementId: string; previous?: OfferValues }) {
@@ -29,7 +29,7 @@ export function ProposalForm({ engagementId, previous }: { engagementId: string;
 
 export function ProposalActions({ proposal }: { proposal: OfferValues }) {
   return <div className="proposal-actions">
-    <form action={acceptProposal}><input type="hidden" name="proposalId" value={proposal.id} /><button className="button button-primary button-small">Accept proposal and create agreement</button></form>
+    <form action={async (formData) => { await acceptProposal(formData); }}><input type="hidden" name="proposalId" value={proposal.id} /><button className="button button-primary button-small">Accept proposal and create agreement</button></form>
     <form action={declineProposal}><input type="hidden" name="proposalId" value={proposal.id} /><button className="button button-secondary button-small">Decline proposal</button></form>
   </div>;
 }

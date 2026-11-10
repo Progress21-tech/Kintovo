@@ -36,7 +36,7 @@ function parseAmount(value: string | undefined) {
   return Number.isSafeInteger(amount) && amount >= 0 ? amount : NaN;
 }
 
-export async function createProjectBrief(_state: { error?: string }, formData: FormData) {
+export async function createProjectBrief(_state: { error?: string }, formData: FormData): Promise<{ error?: string }> {
   const user = await requireUser();
   if (!await platformFlag("NEW_PROJECTS_ENABLED")) return { error: "New project submissions are temporarily paused. Please try again later." };
   const raw = Object.fromEntries(formData.entries());
@@ -123,7 +123,7 @@ export async function submitBriefForReview(formData: FormData) {
   redirect(`/workspace/projects/${project.id}?submitted=1`);
 }
 
-export async function saveWorkstreamEdits(_state: { error?: string; success?: string }, formData: FormData) {
+export async function saveWorkstreamEdits(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const projectId = z.string().min(1).safeParse(formData.get("projectId"));
   if (!projectId.success) return { error: "This brief could not be found." };

@@ -6,7 +6,7 @@ import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
 
-export async function shortlistTalent(_state: { error?: string; success?: string }, formData: FormData) {
+export async function shortlistTalent(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = z.object({ projectId: z.string().min(1), profileId: z.string().min(1), note: z.string().trim().max(500).optional() }).safeParse({ projectId: formData.get("projectId"), profileId: formData.get("profileId"), note: formData.get("note") });
   if (!parsed.success) return { error: "Choose a project to save this candidate." };

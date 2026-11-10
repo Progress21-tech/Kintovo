@@ -18,7 +18,7 @@ const organisationSchema = z.object({
   location: z.string().trim().max(120).optional(),
 });
 
-export async function createOrganisation(_state: { error?: string; success?: string }, formData: FormData) {
+export async function createOrganisation(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = organisationSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the organisation details." };
@@ -46,7 +46,7 @@ const invitationSchema = z.object({
   canApproveSpend: z.enum(["true", "false"]).default("false"),
 });
 
-export async function inviteOrganisationMember(_state: { error?: string; success?: string }, formData: FormData) {
+export async function inviteOrganisationMember(_state: { error?: string; success?: string }, formData: FormData): Promise<{ error?: string; success?: string }> {
   const user = await requireUser();
   const parsed = invitationSchema.safeParse({
     organisationId: formData.get("organisationId"),
