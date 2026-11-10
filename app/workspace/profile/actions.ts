@@ -2,7 +2,7 @@
 
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
-import { enhanceSpecialistProfile, isScopeAiConfigured } from "@/server/scope-service";
+import { enhanceCreatorProfile, enhanceSpecialistProfile, isScopeAiConfigured } from "@/server/scope-service";
 import { z } from "zod";
 
 const profileInput = z.object({
@@ -58,6 +58,44 @@ export async function suggestSpecialistProfile(rawInput: unknown) {
   if (!Object.values(draft).some((value) => value?.trim())) return { error: "Add a headline, description, categories, skills, or market experience first." } as const;
   if (!isScopeAiConfigured()) return { error: "AI profile suggestions are not connected. The platform administrator needs to configure the AI provider." } as const;
   const result = await enhanceSpecialistProfile(draft);
+  if ("error" in result) {
+    const messages = {
+      not_configured: "AI profile suggestions are not configured. Ask the platform administrator to check the AI settings.",
+      authentication_failed: "The AI provider rejected its API key. Ask the platform administrator to check AI_API_KEY in Vercel.",
+      rate_limited: "The AI provider's free-tier quota has been reached. Try again later.",
+      invalid_request: "The AI provider rejected the request. Ask the platform administrator to check the model settings.",
+      invalid_response: "The AI provider returned an unreadable profile suggestion. Try again.",
+      provider_unavailable: "The AI provider is temporarily unavailable. Try again shortly.",
+      timeout: "The AI provider took too long to respond. Try again with a shorter profile draft.",
+      provider_failed: "The AI provider could not be reached. Try again shortly.",
+    };
+    return { error: messages[result.error] } as const;
+  }
+  return { suggestion: result.suggestion } as const;
+}
+
+const creatorEnhancementInput = z.object({
+  consent: z.literal(true),
+  biography: z.string().trim().max(3000).optional(),
+  categories: z.string().trim().max(1000).optional(),
+  platforms: z.string().trim().max(500).optional(),
+});
+
+export async function suggestCreatorProfile(rawInput: unknown) {
+  const user = await requireUser();
+  const parsed = creatorEnhancementInput.safeParse(rawInput);
+  if (!parsed.success) return { error: "Review your creator profile details and confirm consent before requesting suggestions." } as const;
+  const [existingSpecialist, existingCreator, businessMembership] = await Promise.all([
+    db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.organisationMembership.findFirst({ where: { userId: user.id }, select: { id: true } }),
+  ]);
+  if (existingSpecialist && !existingCreator) return { error: "AI profile suggestions are available for creator profiles." } as const;
+  if (!existingCreator && businessMembership) return { error: "Business accounts cannot request creator profile suggestions." } as const;
+  const { consent: _consent, ...draft } = parsed.data;
+  if (!Object.values(draft).some((value) => value?.trim())) return { error: "Add a creator description, content categories, or platforms first." } as const;
+  if (!isScopeAiConfigured()) return { error: "AI profile suggestions are not connected. The platform administrator needs to configure the AI provider." } as const;
+  const result = await enhanceCreatorProfile(draft);
   if ("error" in result) {
     const messages = {
       not_configured: "AI profile suggestions are not configured. Ask the platform administrator to check the AI settings.",
