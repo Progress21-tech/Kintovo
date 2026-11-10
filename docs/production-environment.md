@@ -83,7 +83,7 @@ Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the same Vercel environment
 
 ## AI scope planning
 
-The project brief AI checkbox is opt-in. Without a configured provider, Kintovo uses the transparent local rules-based planner. To enable an OpenAI-compatible provider, set `AI_PROVIDER="compatible"`, `AI_API_BASE_URL` to the provider's chat-completions endpoint, `AI_MODEL` to an approved model name, and `AI_API_KEY` to a server-only secret. The response must follow the structured workstream format; invalid, unavailable, or timed-out responses automatically use the local fallback.
+The project brief AI checkbox is opt-in. Without a configured provider, Kintovo uses the transparent local rules-based planner and tells the user AI is unavailable. To enable an OpenAI-compatible provider, set `AI_PROVIDER="compatible"`, `AI_API_BASE_URL` to the provider's chat-completions endpoint, `AI_MODEL` to an approved model name, and `AI_API_KEY` to a server-only secret. The response must follow the structured workstream format. If the user opts in but the provider is unavailable, invalid, or times out, the brief is not saved as if it had received AI recommendations; the user sees an error and can retry or choose the rules-based planner.
 
 Create a test account and confirm that the success message instructs the user to verify their email, the message arrives, the link uses the production `AUTH_URL`, and `/verify-email` redirects to sign-in. If delivery fails after the configuration guard passes, inspect the server log entry `Signup verification email delivery failed`; it indicates a provider, credential, port, sender, or TLS problem rather than a database problem.
 

@@ -5,7 +5,7 @@ import { createProjectBrief } from "@/app/workspace/actions";
 
 type OrganisationOption = { id: string; name: string };
 
-export function BriefForm({ organisations }: { organisations: OrganisationOption[] }) {
+export function BriefForm({ organisations, aiConfigured }: { organisations: OrganisationOption[]; aiConfigured: boolean }) {
   const [state, action, pending] = useActionState(createProjectBrief, {});
   return <form action={action} className="panel form-panel">
     <div className="form-section"><h2>Start with the outcome</h2><p>Tell us what you want to accomplish. This brief is saved as a draft so you can return and refine it.</p>
@@ -37,7 +37,7 @@ export function BriefForm({ organisations }: { organisations: OrganisationOption
         <label className="span-two">Anything else to know?<textarea name="additionalInformation" placeholder="Optional context" maxLength={1500} /></label>
       </div>
     </div>
-    <label className="scope-ai-consent"><input type="checkbox" name="aiConsent" /><span><strong>Use the configured AI planning provider for this draft</strong><small>If enabled by Kintovo, your objective, target audience, budget range, and deadline will be sent to that provider to draft recommendations. Leave unchecked to use Kintovo’s local rules-based suggestions. Do not include personal or confidential information.</small></span></label>
+    {aiConfigured ? <label className="scope-ai-consent"><input type="checkbox" name="aiConsent" /><span><strong>Request AI-generated workstream recommendations</strong><small>When selected, your objective, target audience, budget range, and deadline will be sent to Kintovo’s configured AI provider to create recommendations for this brief. Leave unchecked for rules-based suggestions. Avoid personal or confidential information.</small></span></label> : <div className="scope-ai-status" role="status"><strong>AI recommendations are not connected</strong><span>This brief will use Kintovo’s rules-based suggestions. A platform administrator must configure an AI provider before you can request AI-generated recommendations.</span></div>}
     {state.error && <p className="form-alert" role="alert">{state.error}</p>}
     <div className="form-actions"><button className="button button-primary" disabled={pending}>{pending ? "Saving brief…" : "Save draft and review plan"}</button></div>
   </form>;

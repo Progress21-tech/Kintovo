@@ -59,7 +59,12 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
   if (!canManageProjects(membership.role)) return { error: "Your organisation role cannot create project briefs. Ask an owner, administrator, or project manager." };
 
   const scopeInput = { objective: parsed.data.objective, targetAudience: parsed.data.targetAudience, budgetMin: min, budgetMax: max, deadline };
-  const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION };
+  const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION, error: undefined };
+  if (!scopeResult.plan) {
+    return { error: scopeResult.error === "not_configured"
+      ? "AI recommendations are not configured yet, so your brief was not saved. Ask the platform administrator to connect an AI provider, or turn off the AI option to use the clearly labeled rules-based suggestions."
+      : "The AI provider could not generate recommendations, so your brief was not saved. Try again later, or turn off the AI option to use rules-based suggestions." };
+  }
   const workstreams = scopeResult.plan.workstreams;
   const project = await db.$transaction(async (tx) => {
     const created = await tx.project.create({

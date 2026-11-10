@@ -236,6 +236,14 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .scope-ai-consent strong, .scope-ai-consent small { display: block; }
 .scope-ai-consent strong { font-size: 11px; }
 .scope-ai-consent small { margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 400; }
+.scope-ai-status { display: grid; gap: 4px; border: 1px solid #ead9bb; border-radius: 4px; padding: 12px 14px; color: #765119; background: #fbf6ec; }
+.scope-ai-status strong { font-size: 11px; }
+.scope-ai-status span { color: #746b5d; font-size: 10px; line-height: 1.5; }
+.scope-plan-panel > .panel-header { align-items: start; }
+.scope-source-note { display: grid; gap: 3px; margin-top: 7px; }
+.scope-source-note strong { display: inline-flex; width: fit-content; border-radius: 3px; padding: 4px 7px; color: #80571e; background: #f9f0e2; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.scope-source-note span { max-width: 700px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.scope-source-note.ai-generated strong { color: var(--teal); background: #e8f2ef; }
 .talent-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
 .talent-card { border: 1px solid var(--line); border-radius: 5px; padding: 18px; background: white; }
 .talent-avatar { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-soft); font-size: 12px; font-weight: 700; }
