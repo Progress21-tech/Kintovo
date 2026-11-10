@@ -38,10 +38,16 @@ export async function registerAccount(_state: { error?: string; success?: string
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again." };
   const requestHeaders = await headers();
   const ip = (requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || requestHeaders.get("x-real-ip") || "unknown").slice(0, 100);
-  const allowed = await Promise.all([
-    consumeRateLimit(rateLimitKey("register-email", parsed.data.email), 5, 60 * 60),
-    consumeRateLimit(rateLimitKey("register-ip", ip), 20, 60 * 60),
-  ]);
+  let allowed: boolean[];
+  try {
+    allowed = await Promise.all([
+      consumeRateLimit(rateLimitKey("register-email", parsed.data.email), 5, 60 * 60),
+      consumeRateLimit(rateLimitKey("register-ip", ip), 20, 60 * 60),
+    ]);
+  } catch (error) {
+    console.error("Signup rate-limit check failed", error);
+    return { error: "Signup is temporarily unavailable. Please try again later." };
+  }
   if (!allowed.every(Boolean)) return { error: "Too many account requests. Try again later." };
   if (parsed.data.context === "BUSINESS" && !parsed.data.organisation) return { error: "Enter your organisation name." };
   if (process.env.NODE_ENV === "production" && (!process.env.SMTP_HOST || !process.env.EMAIL_FROM)) return { error: "Account verification email is not configured yet." };
@@ -71,7 +77,13 @@ export async function registerAccount(_state: { error?: string; success?: string
     await sendAccountEmail(parsed.data.email, "Verify your Kintovo account", verifyUrl);
   } catch (error) {
     if (error instanceof Error && error.message.includes("Unique constraint")) return { error: "An account with that email already exists." };
-    return { error: "We could not create the account. Check the database and email configuration, then try again." };
+    console.error("Signup account creation failed", error);
+    return { error: "We could not create your account right now. Please try again later." };
+  }
+  try {
+  } catch (error) {
+    console.error("Signup verification email delivery failed", error);
+    return { error: "Your account was created, but we could not send the verification email. Please contact support." };
   }
   return { success: "Account created. Use the verification link sent to your email before signing in." };
 }
