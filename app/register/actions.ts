@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { sendAccountEmail } from "@/server/email";
 import { consumeRateLimit, rateLimitKey } from "@/server/rate-limit";
+import { privacyVersion, termsVersion } from "@/server/policies";
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== "false";
 
@@ -15,6 +16,8 @@ const accountSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: z.email().trim().toLowerCase(),
   password: z.string().min(12).max(200),
+  acceptTerms: z.literal("on"),
+  acceptPrivacy: z.literal("on"),
   context: z.enum(["BUSINESS", "SPECIALIST", "CREATOR"]),
   organisation: z.string().trim().max(120).optional(),
   website: z.union([z.literal(""), z.url()]).optional(),
@@ -29,6 +32,8 @@ export async function registerAccount(_state: { error?: string; success?: string
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    acceptTerms: formData.get("acceptTerms"),
+    acceptPrivacy: formData.get("acceptPrivacy"),
     context: formData.get("context"),
     organisation: formData.get("organisation") ?? undefined,
     website: formData.get("website") ?? "",
@@ -57,9 +62,10 @@ export async function registerAccount(_state: { error?: string; success?: string
   const token = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const acceptedAt = new Date();
   try {
     await db.$transaction(async (tx) => {
-      const user = await tx.user.create({ data: { name: parsed.data.name, email: parsed.data.email, passwordHash } });
+      const user = await tx.user.create({ data: { name: parsed.data.name, email: parsed.data.email, passwordHash, termsAcceptedAt: acceptedAt, termsVersion, privacyAcceptedAt: acceptedAt, privacyVersion } });
       if (parsed.data.context === "BUSINESS") {
         const organisation = await tx.organisation.create({ data: {
           name: parsed.data.organisation!, website: parsed.data.website || null,
@@ -73,7 +79,7 @@ export async function registerAccount(_state: { error?: string; success?: string
         await tx.creatorProfile.create({ data: { userId: user.id, platforms: [], contentCategories: [] } });
       }
       await tx.verificationToken.create({ data: { identifier: parsed.data.email, token: tokenHash, purpose: "email_verification", expires: new Date(Date.now() + 1000 * 60 * 60 * 24) } });
-      await tx.auditLog.create({ data: { actorId: user.id, action: "ACCOUNT_CREATED", entityType: "User", entityId: user.id } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "ACCOUNT_CREATED", entityType: "User", entityId: user.id, metadata: { termsVersion, privacyVersion } } });
     });
     if (requireEmailVerification) {
       const verifyUrl = `${process.env.AUTH_URL ?? "http://localhost:3000"}/verify-email?token=${token}`;

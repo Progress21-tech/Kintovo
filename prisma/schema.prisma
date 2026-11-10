@@ -195,6 +195,10 @@ model User {
   phone           String?
   passwordHash    String
   emailVerifiedAt DateTime?
+  termsAcceptedAt DateTime?
+  termsVersion    String?
+  privacyAcceptedAt DateTime?
+  privacyVersion  String?
   platformRole    PlatformRole @default(USER)
   disabledAt      DateTime?
   bannedAt        DateTime?

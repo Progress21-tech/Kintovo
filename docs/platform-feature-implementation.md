@@ -92,3 +92,18 @@ Permanent bans retain the account and audit record and block that account from s
 ### Validation and delivery
 
 - `git diff --check` and source-level review are used for this stage. Automated checks remain blocked because dependency installation cannot reach the npm registry and no database is configured.
+
+## Stage 6 — Terms, Privacy, and required acceptance
+
+### Implemented
+
+- Replaced the placeholder Terms and Privacy pages with product-specific draft documents covering human review, profile visibility, complaints, disputes, ratings, campaign attribution, fee ceilings, simulated compensation, the 24-hour withdrawal hold, account suspension/bans, activity/security data, retention, and current deletion/IP-blacklist limitations.
+- Added versioned acceptance timestamps to user records. Email/password registration requires separate Terms agreement and Privacy acknowledgement. Google onboarding collects the same acceptance.
+- Existing signed-in accounts must accept the current versions before using protected workspace pages or server actions. Policy acceptance is audit-logged and updates are version-controlled.
+- Added a migration for the acceptance version/timestamp fields.
+
+### Legal and validation limits
+
+- These documents remain explicit drafts. Legal operator identity/contact, governing law, regulatory obligations, rights processes, subprocessors, hosting locations, retention schedule, and production payout terms still need qualified review and completion.
+- Account bans retain user/audit data. Automatic deletion of banned records and IP blacklisting remain unimplemented; the Privacy Notice discloses this.
+- `git diff --check` and source-level review are used. Full application checks remain blocked because npm registry access and a test database are unavailable.

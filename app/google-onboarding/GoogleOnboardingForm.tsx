@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Clapperboard, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { completeGoogleOnboarding } from "./actions";
@@ -62,6 +63,9 @@ export function GoogleOnboardingForm() {
         <label>Publishing platforms <span className="field-note">Optional · separate with commas</span><input name="platforms" placeholder="Instagram, YouTube, TikTok" maxLength={500} /></label>
         <label>Content categories <span className="field-note">Optional · separate with commas</span><input name="categories" placeholder="Food, technology, culture" maxLength={1000} /></label>
       </div>}
+
+      <label className="legal-consent"><input type="checkbox" name="acceptTerms" required /><span>I agree to the <Link href="/terms" target="_blank">Terms of Service</Link>.</span></label>
+      <label className="legal-consent"><input type="checkbox" name="acceptPrivacy" required /><span>I acknowledge the <Link href="/privacy" target="_blank">Privacy Notice</Link>.</span></label>
 
       {state.error && <p className="form-alert" role="alert">{state.error}</p>}
       <button className="button button-primary button-wide" disabled={pending}>{pending ? "Setting up your workspace…" : context === "BUSINESS" ? "Create business workspace" : "Complete profile setup"}</button>

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useState } from "react";
+import Link from "next/link";
 import { registerAccount } from "./actions";
 import { signIn } from "next-auth/react";
 import { GoogleMark } from "@/components/GoogleMark";
@@ -29,11 +30,13 @@ export function RegisterForm({ initialContext = "BUSINESS", googleConfigured = f
         <label>Product or service<input name="product" placeholder="What do you offer?" maxLength={300} /></label>
         <label>Business location<input name="location" placeholder="City, country" maxLength={120} /></label>
       </>}
+      <label className="legal-consent"><input type="checkbox" name="acceptTerms" required /><span>I agree to the <Link href="/terms" target="_blank">Terms of Service</Link>.</span></label>
+      <label className="legal-consent"><input type="checkbox" name="acceptPrivacy" required /><span>I acknowledge the <Link href="/privacy" target="_blank">Privacy Notice</Link>.</span></label>
       {state.error && <p className="form-alert" role="alert">{state.error}</p>}
       {state.success && <p className="form-success" role="status">{state.success}</p>}
       <button className="button button-primary button-wide" disabled={pending}>{pending ? "Creating account…" : "Create account"}</button>
       {googleConfigured && <><div className="auth-divider"><span>or</span></div><button className="button button-secondary button-wide" type="button" onClick={() => signIn("google", { callbackUrl: "/google-onboarding" })}><GoogleMark />Continue with Google</button></>}
-      <p className="field-note">By creating an account you acknowledge that the Terms and Privacy pages are draft documents awaiting legal review.</p>
+      <p className="field-note">Your accepted document versions and timestamps are recorded with your account. The documents remain drafts pending qualified legal review.</p>
     </form>
   );
 }
