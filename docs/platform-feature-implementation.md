@@ -107,3 +107,17 @@ Permanent bans retain the account and audit record and block that account from s
 - These documents remain explicit drafts. Legal operator identity/contact, governing law, regulatory obligations, rights processes, subprocessors, hosting locations, retention schedule, and production payout terms still need qualified review and completion.
 - Account bans retain user/audit data. Automatic deletion of banned records and IP blacklisting remain unimplemented; the Privacy Notice discloses this.
 - `git diff --check` and source-level review are used. Full application checks remain blocked because npm registry access and a test database are unavailable.
+
+## Stage 7 — Approved project discovery for Specialists
+
+### Implemented
+
+- Added approved project goals in the Specialist Opportunities workspace. Only briefs moved into `MATCHING` by the existing human-review action are listed.
+- Only a Specialist with a published profile and approved portfolio/authorship review can browse and express interest. Existing organisation members do not receive their own business's matching goals.
+- Expressing interest creates an engagement, notifies the business, and records an audit event. The Specialist can then prepare a proposal through the existing negotiation flow.
+
+Creators continue to be discovered through the existing approved-profile campaign invitation flow; they do not apply to project briefs because project engagements currently attach only to Specialist profiles.
+
+### Validation and delivery
+
+- Source review and `git diff --check` are used. End-to-end browser testing and database checks remain blocked by dependency registry access and no configured test database.

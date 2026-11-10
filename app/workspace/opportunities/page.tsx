@@ -4,16 +4,23 @@ import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { AgreementAcceptanceForm, ProposalActions, ProposalForm, type OfferValues } from "../engagements/EngagementForms";
+import { expressInterestInProject } from "./actions";
 
 export default async function OpportunitiesPage() {
   const user = await requireUser();
-  const profile = await db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+  const profile = await db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true, isPublished: true, trustReviews: { where: { dimension: "PORTFOLIO_SKILLS", status: "APPROVED" }, select: { id: true }, take: 1 } } });
   if (!profile) redirect("/workspace/professional");
-  const engagements = await db.engagement.findMany({
+  const canDiscover = profile.isPublished && profile.trustReviews.length > 0;
+  const memberships = await db.organisationMembership.findMany({ where: { userId: user.id }, select: { organisationId: true } });
+  const [engagements, approvedGoals] = await Promise.all([db.engagement.findMany({
     where: { professionalProfileId: profile.id },
     include: { project: { include: { brief: true, organisation: { select: { name: true } }, createdBy: { select: { id: true, name: true } } } }, proposals: { orderBy: { version: "desc" } }, agreements: { include: { terms: true }, orderBy: { version: "desc" } } },
     orderBy: { updatedAt: "desc" },
-  });
+  }), canDiscover ? db.project.findMany({
+    where: { status: "MATCHING", engagements: { none: { professionalProfileId: profile.id } }, ...(memberships.length ? { organisationId: { notIn: memberships.map((item) => item.organisationId) } } : {}) },
+    include: { brief: true, organisation: { select: { name: true } }, workstreams: { select: { recommendedRoles: true } } },
+    orderBy: { updatedAt: "desc" }, take: 100,
+  }) : Promise.resolve([])]);
   const businessIds = [...new Set(engagements.map((item) => item.project.createdBy.id))];
   const [projectRatings, campaignRatings] = await Promise.all([
     businessIds.length ? db.engagementRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: businessIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
@@ -27,7 +34,8 @@ export default async function OpportunitiesPage() {
     businessRatings.set(item.revieweeId, current);
   }
   return <main className="app-main">
-    <PageHeader eyebrow="Specialist workspace" title="Project opportunities" description="Review direct invitations, submit a proposal, and negotiate terms with a versioned offer history." action={<Link className="button button-secondary" href="/workspace/professional">Professional home</Link>} />
+    <PageHeader eyebrow="Specialist workspace" title="Project opportunities" description="Browse business goals approved for matching, express interest, and review direct invitations." action={<Link className="button button-secondary" href="/workspace/professional">Professional home</Link>} />
+    <section className="review-list"><h2 className="section-subhead">Approved business goals open to Specialists</h2>{!canDiscover && <p className="field-note">Your Specialist profile must pass human review and be published before you can express interest in matching projects.</p>}{approvedGoals.length ? approvedGoals.map((project) => <article className="panel" key={project.id}><div className="panel-header"><div><h2>{project.title}</h2><span className="field-note">{project.organisation.name} · Approved for matching · {project.brief?.targetMarket ?? "Nigeria"}</span></div><span className="status-pill green">Human review passed</span></div><div className="panel-content"><p className="review-objective">{project.brief?.objective}</p><div className="talent-tags">{[...new Set(project.workstreams.flatMap((item) => item.recommendedRoles))].slice(0, 8).map((role) => <span className="chip" key={role}>{role}</span>)}</div><p className="field-note">Deadline: {project.brief?.deadline?.toLocaleDateString("en-NG") ?? "Open"} · Budget: {project.brief && (project.brief.budgetMin !== null || project.brief.budgetMax !== null) ? `${project.brief.currency} ${project.brief.budgetMin?.toLocaleString("en-NG") ?? "—"} to ${project.brief.budgetMax?.toLocaleString("en-NG") ?? "—"}` : "To be agreed"}</p><form action={expressInterestInProject}><input type="hidden" name="projectId" value={project.id} /><button className="button button-primary button-small">Express interest</button><small className="field-note">The business will be notified and can review your published profile before negotiating a proposal.</small></form></div></article>) : canDiscover ? <p className="field-note">No approved Specialist opportunities are open right now.</p> : null}</section>
     {engagements.length ? <div className="opportunity-list">{engagements.map((engagement) => {
       const latest = engagement.proposals[0];
       const agreement = engagement.agreements[0];
