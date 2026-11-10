@@ -21,6 +21,18 @@ export default async function TalentPage({ searchParams }: { searchParams: Promi
     orderBy: { user: { name: "asc" } },
     take: 200,
   });
+  const profileUserIds = profiles.map((profile) => profile.userId);
+  const [reviewStats, campaignReviewStats] = await Promise.all([
+    profileUserIds.length ? db.engagementRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: profileUserIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
+    profileUserIds.length ? db.campaignRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: profileUserIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
+  ]);
+  const reputation = new Map<string, { sum: number; count: number }>();
+  for (const item of [...reviewStats, ...campaignReviewStats]) {
+    const current = reputation.get(item.revieweeId) ?? { sum: 0, count: 0 };
+    current.sum += (item._avg.rating ?? 0) * item._count._all;
+    current.count += item._count._all;
+    reputation.set(item.revieweeId, current);
+  }
   const needle = query.q?.trim().toLowerCase();
   const filtered = profiles.filter((profile) => {
     if (needle && ![profile.user.name, profile.headline ?? "", profile.biography ?? "", ...profile.skills, ...profile.categories, profile.marketExperience ?? ""].some((item) => item.toLowerCase().includes(needle))) return false;
@@ -55,7 +67,7 @@ export default async function TalentPage({ searchParams }: { searchParams: Promi
       <span className="talent-avatar" aria-hidden="true">{profile.user.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span>
       <h3>{profile.user.name}</h3><p>{profile.headline ?? "Independent professional"} · {[profile.city, profile.country].filter(Boolean).join(", ")}</p>
       <div className="talent-tags">{profile.categories.slice(0, 4).map((item) => <span className="chip" key={item}>{item}</span>)}{profile.skills.slice(0, 5).map((item) => <span className="chip" key={item}>{item}</span>)}</div>
-      <div className="talent-meta"><span className="status-pill green">Profile reviewed</span>{match && <span className="status-pill blue">{match.reasons.length} fit signals</span>}<span className="field-note">{profile.availabilityStatus.replaceAll("_", " ")}{profile.availability ? ` · ${profile.availability}` : ""}</span></div>
+      <div className="talent-meta"><span className="status-pill green">Profile reviewed</span>{reputation.has(profile.userId) && <span className="status-pill blue">{(reputation.get(profile.userId)!.sum / reputation.get(profile.userId)!.count).toFixed(1)}/5 · {reputation.get(profile.userId)!.count} ratings</span>}{match && <span className="status-pill blue">{match.reasons.length} fit signals</span>}<span className="field-note">{profile.availabilityStatus.replaceAll("_", " ")}{profile.availability ? ` · ${profile.availability}` : ""}</span></div>
       {profile.marketExperience && <p className="talent-market">Market experience: {profile.marketExperience}</p>}
       {profile.trustReviews.length > 0 && <div className="talent-tags">{profile.trustReviews.map((review) => <span className="chip" key={review.dimension}>{review.dimension.replaceAll("_", " ")} reviewed</span>)}</div>}
       {match && <div className="match-explanation"><strong>Why this may fit</strong>{match.reasons.length ? <ul>{match.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul> : <p>No positive fit signals were identified yet.</p>}{match.gaps.length > 0 && <details><summary>Information not confirmed</summary><ul>{match.gaps.map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}</div>}

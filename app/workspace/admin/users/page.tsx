@@ -27,7 +27,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     orderBy: { createdAt: "desc" },
     take: 150,
   });
-  const [paidByRecipient, paidByPayer] = await Promise.all([db.compensationObligation.groupBy({
+  const [paidByRecipient, paidByPayer, reviewStats, campaignReviewStats] = await Promise.all([db.compensationObligation.groupBy({
     by: ["recipientId", "currency"],
     where: { status: { in: ["SIMULATED_PAID", "PROVIDER_CONFIRMED_PAID"] }, recipientId: { not: null } },
     _sum: { amount: true },
@@ -35,7 +35,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     by: ["createdById", "currency"],
     where: { status: { in: ["SIMULATED_PAID", "PROVIDER_CONFIRMED_PAID"] }, createdById: { not: null } },
     _sum: { amount: true },
-  })]);
+  }), db.engagementRating.groupBy({ by: ["revieweeId"], _avg: { rating: true }, _count: { _all: true } }), db.campaignRating.groupBy({ by: ["revieweeId"], _avg: { rating: true }, _count: { _all: true } })]);
   const recipientTotals = new Map<string, string[]>();
   for (const item of paidByRecipient) {
     if (!item.recipientId) continue;
@@ -50,6 +50,15 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     lines.push(`${item.currency} ${(item._sum.amount ?? 0).toLocaleString("en-NG")}`);
     payerTotals.set(item.createdById, lines);
   }
+  const reputation = new Map<string, string>();
+  const combinedReviews = new Map<string, { sum: number; count: number }>();
+  for (const item of [...reviewStats, ...campaignReviewStats]) {
+    const current = combinedReviews.get(item.revieweeId) ?? { sum: 0, count: 0 };
+    current.sum += (item._avg.rating ?? 0) * item._count._all;
+    current.count += item._count._all;
+    combinedReviews.set(item.revieweeId, current);
+  }
+  for (const [id, item] of combinedReviews) reputation.set(id, `${(item.sum / item.count).toFixed(1)}/5 · ${item.count} review${item.count === 1 ? "" : "s"}`);
   return <main className="app-main">
     <PageHeader eyebrow="Administration" title="People and accounts" description="Review account setup, profile approval, recent activity, and recorded compensation by recipient. Compensation totals distinguish simulated records from provider-confirmed payments." />
     <form className="panel talent-search-form" method="get">
@@ -73,6 +82,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <p className="field-note">Last active: {person.lastActiveAt?.toLocaleString("en-NG") ?? "No tracked workspace activity"} · Email: {person.emailVerifiedAt ? "verified" : "unverified"}</p>
             <p className="field-note">Received compensation: {recipientTotals.get(person.id)?.join(" · ") ?? "None"} {recipientTotals.has(person.id) ? "(includes simulated settlement records)" : ""}</p>
             <p className="field-note">Obligations initiated: {payerTotals.get(person.id)?.join(" · ") ?? "None"} {payerTotals.has(person.id) ? "(includes simulated settlement records)" : ""}</p>
+            <p className="field-note">Project reputation: {reputation.get(person.id) ?? "No completed-project ratings"}</p>
             {person.banReason && <p className="legal-note">Ban reason: {person.banReason}</p>}
             {person.id !== actor.id && !person.bannedAt && <div className="admin-account-actions">
               {person.disabledAt ? <form action={updateAccountAccess} className="inline-form"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="action" value="RESTORE" /><label>Reason for restoring access<input name="reason" minLength={8} maxLength={1000} required /></label><button className="button button-secondary button-small">Restore access</button></form> : <form action={updateAccountAccess} className="inline-form"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="action" value="SUSPEND" /><label>Reason for temporary suspension<input name="reason" minLength={8} maxLength={1000} required /></label><button className="button button-secondary button-small">Suspend temporarily</button></form>}

@@ -10,6 +10,7 @@ import { canApproveSpend } from "@/server/permissions";
 import { PlanEditor } from "./PlanEditor";
 import { DeleteBriefForm } from "./DeleteBriefForm";
 import { ChangeRequestForm, DisputeForm, MessageForm, MilestoneSubmissionForm, TaskCreateForm } from "../DeliveryForms";
+import { ProjectRatings } from "../ProjectRatings";
 import { completeProject, changeTaskStatus, respondToChangeRequest, reviewMilestone, startMilestone } from "../delivery-actions";
 
 const statusLabels: Record<string, string> = { DRAFT: "Draft", SUBMITTED: "Submitted for review", IN_REVIEW: "In review", MATCHING: "Talent matching", ACTIVE: "Active", COMPLETED: "Completed", CANCELLED: "Cancelled" };
@@ -25,7 +26,7 @@ export default async function ProjectBriefPage({ params, searchParams }: { param
     workstreams: { orderBy: { createdAt: "asc" } },
     organisation: { select: { name: true } },
     shortlists: { include: { professional: { include: { user: { select: { name: true } }, portfolio: { where: { isPublic: true }, take: 3 } } } }, orderBy: { createdAt: "desc" } },
-    engagements: { include: { professional: { include: { user: { select: { name: true } } } }, proposals: { orderBy: { version: "desc" } }, agreements: { include: { terms: true }, orderBy: { version: "desc" } } }, orderBy: { createdAt: "desc" } },
+    engagements: { include: { professional: { include: { user: { select: { name: true } } } }, proposals: { orderBy: { version: "desc" } }, agreements: { include: { terms: true }, orderBy: { version: "desc" } }, ratings: { select: { reviewerId: true, rating: true } } }, orderBy: { createdAt: "desc" } },
     tasks: { include: { assignee: { include: { user: { select: { id: true, name: true } } } } }, orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }] },
     milestones: { include: { assignedProfile: { include: { user: { select: { id: true, name: true } } } }, submissions: { include: { submittedBy: { select: { name: true } } }, orderBy: { createdAt: "desc" } }, events: { include: { actor: { select: { name: true } } }, orderBy: { createdAt: "desc" } } }, orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }] },
     messages: { include: { author: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" }, take: 100 },
@@ -61,6 +62,7 @@ export default async function ProjectBriefPage({ params, searchParams }: { param
         <div className="aside-card" style={{ marginTop: 14 }}><h3>About the suggestions</h3><p>Recommendations are a planning draft based on the source shown above. They are not verified facts, hiring decisions, or binding terms. Review and edit them before submitting.</p></div>
       </aside>
     </div>
+    {project.status === "COMPLETED" && (access.membership || access.talentEngagement) && <ProjectRatings engagements={engagements} userId={user.id} isBusiness={Boolean(access.membership)} businessName={project.organisation.name} />}
     <section className="review-list engagement-list"><h2 className="section-subhead">Invitations, proposals, and agreements</h2>{engagements.length ? engagements.map((engagement) => {
       const latest = engagement.proposals[0];
       const agreement = engagement.agreements[0];

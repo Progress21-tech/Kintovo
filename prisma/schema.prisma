@@ -132,6 +132,12 @@ enum ComplaintStatus {
   RESOLVED
   CLOSED
 }
+enum WithdrawalStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PAID
+}
 enum ChangeRequestStatus {
   PENDING
   ACCEPTED
@@ -213,6 +219,12 @@ model User {
   paymentObligationsReceived CompensationObligation[] @relation("ObligationRecipient")
   complaints      Complaint[]  @relation("ComplaintReporter")
   assignedComplaints Complaint[] @relation("ComplaintAssignee")
+  ratingsGiven    EngagementRating[] @relation("RatingAuthor")
+  ratingsReceived EngagementRating[] @relation("RatingRecipient")
+  campaignRatingsGiven CampaignRating[] @relation("CampaignRatingAuthor")
+  campaignRatingsReceived CampaignRating[] @relation("CampaignRatingRecipient")
+  withdrawals     WithdrawalRequest[] @relation("WithdrawalOwner")
+  withdrawalsReviewed WithdrawalRequest[] @relation("WithdrawalReviewer")
   @@index([lastActiveAt, disabledAt, bannedAt])
 }
 
@@ -348,6 +360,7 @@ model Project {
   messages       ProjectMessage[]
   shortlists     TalentShortlist[]
   changeRequests ChangeRequest[]
+  ratings        EngagementRating[]
   disputes       Dispute[]
   reviews        ProjectReview[]
   compensationObligations CompensationObligation[]
@@ -412,6 +425,7 @@ model Engagement {
   agreements            Agreement[]
   @@unique([projectId, professionalProfileId])
   @@index([professionalProfileId, status, updatedAt])
+  ratings EngagementRating[]
 }
 
 model Proposal {
@@ -689,6 +703,24 @@ model ProjectReview {
   @@index([projectId, createdAt])
 }
 
+model EngagementRating {
+  id           String     @id @default(cuid())
+  engagementId String
+  projectId    String
+  reviewerId   String
+  revieweeId   String
+  rating       Int
+  comment      String?
+  createdAt    DateTime   @default(now())
+  engagement   Engagement @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewer     User       @relation("RatingAuthor", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee     User       @relation("RatingRecipient", fields: [revieweeId], references: [id], onDelete: Cascade)
+  @@unique([engagementId, revieweeId])
+  @@index([revieweeId, createdAt])
+  @@index([projectId, createdAt])
+}
+
 model Campaign {
   id             String         @id @default(cuid())
   organisationId String?
@@ -731,6 +763,7 @@ model CampaignCreator {
   content            CampaignContent[]
   attributions       CampaignAttribution[]
   clicks             CampaignClick[]
+  ratings            CampaignRating[]
   fixedObligation    CompensationObligation?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
@@ -782,6 +815,21 @@ model CampaignClick {
   @@index([campaignCreatorId, occurredAt])
 }
 
+model CampaignRating {
+  id                String          @id @default(cuid())
+  campaignCreatorId String
+  reviewerId        String
+  revieweeId        String
+  rating            Int
+  comment           String?
+  createdAt         DateTime        @default(now())
+  campaignCreator   CampaignCreator @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  reviewer          User            @relation("CampaignRatingAuthor", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee          User            @relation("CampaignRatingRecipient", fields: [revieweeId], references: [id], onDelete: Cascade)
+  @@unique([campaignCreatorId, revieweeId])
+  @@index([revieweeId, createdAt])
+}
+
 model CompensationObligation {
   id            String             @id @default(cuid())
   reference     String             @unique
@@ -807,6 +855,23 @@ model CompensationObligation {
   attribution   CampaignAttribution? @relation(fields: [attributionId], references: [id])
   ledgerEntries LedgerEntry[]
   @@index([status, createdAt])
+}
+
+model WithdrawalRequest {
+  id          String          @id @default(cuid())
+  userId      String
+  amount      Int
+  currency    String
+  status      WithdrawalStatus @default(PENDING_REVIEW)
+  requestedAt DateTime        @default(now())
+  reviewAfter DateTime
+  reviewedAt  DateTime?
+  reviewerId  String?
+  reviewNote  String?
+  user        User            @relation("WithdrawalOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer    User?           @relation("WithdrawalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  @@index([status, reviewAfter])
+  @@index([userId, status, requestedAt])
 }
 
 model LedgerEntry {

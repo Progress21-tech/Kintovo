@@ -8,7 +8,7 @@ export default async function AdminPage() {
   const user = await requireUser();
   if (user.platformRole !== "ADMIN") redirect("/workspace");
   const activeSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [accounts, activeUsers, businesses, submittedSpecialists, approvedSpecialists, submittedCreators, approvedCreators, approvedBusinesses, pendingBusinessGoals, openReviews, openDisputes, paymentExceptions, recentAudit, recentUsers, roleCounts, paymentTotals] = await Promise.all([
+  const [accounts, activeUsers, businesses, submittedSpecialists, approvedSpecialists, submittedCreators, approvedCreators, approvedBusinesses, pendingBusinessGoals, openReviews, openDisputes, paymentExceptions, recentAudit, recentUsers, roleCounts, paymentTotals, ratingStats, campaignRatingStats, pendingWithdrawals] = await Promise.all([
     db.user.count(),
     db.user.count({ where: { lastActiveAt: { gte: activeSince }, disabledAt: null, bannedAt: null } }),
     db.organisation.count(),
@@ -25,9 +25,14 @@ export default async function AdminPage() {
     db.user.findMany({ orderBy: { createdAt: "desc" }, take: 8, select: { id: true, name: true, email: true, platformRole: true, disabledAt: true, bannedAt: true, createdAt: true, lastActiveAt: true } }),
     db.user.groupBy({ by: ["platformRole"], _count: { _all: true } }),
     db.compensationObligation.groupBy({ by: ["currency", "status"], _sum: { amount: true }, where: { status: { in: ["SIMULATED_PAID", "PROVIDER_CONFIRMED_PAID"] } } }),
+    db.engagementRating.aggregate({ _avg: { rating: true }, _count: { _all: true } }),
+    db.campaignRating.aggregate({ _avg: { rating: true }, _count: { _all: true } }),
+    db.withdrawalRequest.count({ where: { status: "PENDING_REVIEW" } }),
   ]);
   const roleTotals = Object.fromEntries(roleCounts.map((item) => [item.platformRole, item._count._all]));
   const paidTotals = paymentTotals.map((item) => `${item.currency} ${(item._sum.amount ?? 0).toLocaleString("en-NG")} ${item.status === "SIMULATED_PAID" ? "simulated" : "provider-confirmed"}`);
+  const ratingCount = ratingStats._count._all + campaignRatingStats._count._all;
+  const ratingAverage = ratingCount ? ((ratingStats._avg.rating ?? 0) * ratingStats._count._all + (campaignRatingStats._avg.rating ?? 0) * campaignRatingStats._count._all) / ratingCount : null;
   const links = [
     { href: "/workspace/admin/users", title: "People and accounts", description: "Review activity and profile status; suspend, restore, or permanently ban accounts." },
     { href: "/workspace/operations", title: "Operations overview", description: "Review queues, platform activity, and operational counts." },
@@ -51,6 +56,8 @@ export default async function AdminPage() {
       <article className="metric"><span>Talent evidence reviews</span><strong>{openReviews}</strong><small>Awaiting action</small></article>
       <article className="metric"><span>Open disputes</span><strong>{openDisputes}</strong><small>Needs review</small></article>
       <article className="metric"><span>Payment exceptions</span><strong>{paymentExceptions}</strong><small>Failed or disputed obligations</small></article>
+      <article className="metric"><span>Withdrawals awaiting review</span><strong>{pendingWithdrawals}</strong><small>24-hour hold applies before review</small></article>
+      <article className="metric"><span>Project and campaign ratings</span><strong>{ratingAverage?.toFixed(1) ?? "—"}/5</strong><small>{ratingCount} ratings from completed work</small></article>
     </section>
     <div className="admin-console-grid">
       <section className="panel"><div className="panel-header"><h2>Platform management</h2></div><div className="panel-content admin-link-list">{links.map((link) => <Link href={link.href} key={link.href}><strong>{link.title}</strong><span>{link.description}</span><b aria-hidden="true">→</b></Link>)}</div></section>

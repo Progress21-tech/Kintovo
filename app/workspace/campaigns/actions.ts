@@ -195,3 +195,29 @@ export async function reviewManualAttribution(formData: FormData) {
   revalidatePath("/workspace/campaigns");
   revalidatePath("/workspace/operations/campaigns");
 }
+
+export async function submitCampaignRating(_state: { error?: string; success?: string }, formData: FormData) {
+  const user = await requireUser();
+  const input = z.object({ campaignCreatorId: z.string().min(1), rating: z.string(), comment: z.string().trim().max(1000) }).safeParse(Object.fromEntries(formData.entries()));
+  if (!input.success) return { error: input.error.issues[0]?.message ?? "Select a rating from one to five." };
+  const rating = Number(input.data.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return { error: "Select a rating from one to five." };
+  const participation = await db.campaignCreator.findUnique({ where: { id: input.data.campaignCreatorId }, include: { campaign: { select: { id: true, title: true, status: true, createdById: true } }, creator: { select: { userId: true } } } });
+  if (!participation || participation.status !== "COMPLETED" || participation.campaign.status !== "COMPLETED") return { error: "Campaign ratings are available after the campaign is complete." };
+  const isCreator = participation.creator.userId === user.id;
+  const isManager = !isCreator && Boolean(await campaignManager(participation.campaignId, user.id));
+  if (!isCreator && !isManager) return { error: "Only a campaign participant can submit this rating." };
+  const revieweeId = isCreator ? participation.campaign.createdById : participation.creator.userId;
+  if (revieweeId === user.id) return { error: "You cannot rate your own account." };
+  try {
+    const created = await db.campaignRating.create({ data: { campaignCreatorId: participation.id, reviewerId: user.id, revieweeId, rating, comment: input.data.comment || null } });
+    await db.auditLog.create({ data: { actorId: user.id, action: "CAMPAIGN_RATING_SUBMITTED", entityType: "CampaignRating", entityId: created.id, metadata: { rating, campaignId: participation.campaign.id } } });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Unique constraint")) return { error: "You have already rated this completed campaign." };
+    throw error;
+  }
+  revalidatePath("/workspace/campaigns");
+  revalidatePath("/workspace/admin");
+  revalidatePath("/workspace/admin/users");
+  return { success: "Your campaign rating has been recorded." };
+}

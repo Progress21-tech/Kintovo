@@ -11,9 +11,21 @@ export default async function OpportunitiesPage() {
   if (!profile) redirect("/workspace/professional");
   const engagements = await db.engagement.findMany({
     where: { professionalProfileId: profile.id },
-    include: { project: { include: { brief: true, organisation: { select: { name: true } } } }, proposals: { orderBy: { version: "desc" } }, agreements: { include: { terms: true }, orderBy: { version: "desc" } } },
+    include: { project: { include: { brief: true, organisation: { select: { name: true } }, createdBy: { select: { id: true, name: true } } } }, proposals: { orderBy: { version: "desc" } }, agreements: { include: { terms: true }, orderBy: { version: "desc" } } },
     orderBy: { updatedAt: "desc" },
   });
+  const businessIds = [...new Set(engagements.map((item) => item.project.createdBy.id))];
+  const [projectRatings, campaignRatings] = await Promise.all([
+    businessIds.length ? db.engagementRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: businessIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
+    businessIds.length ? db.campaignRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: businessIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
+  ]);
+  const businessRatings = new Map<string, { sum: number; count: number }>();
+  for (const item of [...projectRatings, ...campaignRatings]) {
+    const current = businessRatings.get(item.revieweeId) ?? { sum: 0, count: 0 };
+    current.sum += (item._avg.rating ?? 0) * item._count._all;
+    current.count += item._count._all;
+    businessRatings.set(item.revieweeId, current);
+  }
   return <main className="app-main">
     <PageHeader eyebrow="Specialist workspace" title="Project opportunities" description="Review direct invitations, submit a proposal, and negotiate terms with a versioned offer history." action={<Link className="button button-secondary" href="/workspace/professional">Professional home</Link>} />
     {engagements.length ? <div className="opportunity-list">{engagements.map((engagement) => {
@@ -21,7 +33,7 @@ export default async function OpportunitiesPage() {
       const agreement = engagement.agreements[0];
       const editable = !agreement && ["INVITED", "PROPOSED", "NEGOTIATING"].includes(engagement.status);
       return <article className="panel opportunity-card" key={engagement.id}>
-        <div className="panel-header"><div><h2>{engagement.project.title}</h2><span className="field-note">{engagement.project.organisation.name} · {engagement.status.replaceAll("_", " ")}</span></div><Link className="text-link" href={`/workspace/projects/${engagement.projectId}`}>Open project</Link></div>
+        <div className="panel-header"><div><h2>{engagement.project.title}</h2><span className="field-note">{engagement.project.organisation.name} · Business contact: {engagement.project.createdBy.name} · {engagement.status.replaceAll("_", " ")}</span>{businessRatings.get(engagement.project.createdBy.id) && <small className="field-note">Business reputation: {(businessRatings.get(engagement.project.createdBy.id)!.sum / businessRatings.get(engagement.project.createdBy.id)!.count).toFixed(1)}/5 · {businessRatings.get(engagement.project.createdBy.id)!.count} ratings</small>}</div><Link className="text-link" href={`/workspace/projects/${engagement.projectId}`}>Open project</Link></div>
         <div className="panel-content">
           <p className="review-objective">{engagement.project.brief?.objective}</p>
           {engagement.message && <p className="notice">Invitation note: {engagement.message}</p>}

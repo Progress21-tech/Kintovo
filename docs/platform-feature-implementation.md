@@ -62,3 +62,19 @@ Permanent bans retain the account and audit record and block that account from s
 - Static review and `git diff --check` are used for this stage.
 - The complaint route is restricted to Admin and Operations on both page and action. User settings remain available to signed-in users.
 - Runtime, database migration, automated, and browser testing remain pending the required Node.js runtime and a configured test database.
+
+## Stage 4 — Bilateral ratings and withdrawal review
+
+### Implemented
+
+- Added one-to-five feedback for each completed Specialist engagement. Business participants rate the Specialist; the Specialist rates the business project owner.
+- Added the same reciprocal rating flow to completed Creator campaigns.
+- Ratings are one-per-participant per engagement/campaign, constrained to one through five in PostgreSQL, and only accepted after completion. Ratings and average counts appear in talent/campaign selection and admin account monitoring.
+- Added withdrawal requests against settled ledger balances, with reserved-balance accounting and a 24-hour minimum hold before Operations/Finance can review. Approval authorises future provider processing only; it does not move funds.
+- Added rejection/approval notifications and audit records. Review rechecks available funds so refunds or other requests cannot make an approval exceed the remaining balance.
+- Added database records and migration for campaign/project ratings and withdrawal requests.
+
+### Validation and delivery
+
+- `git diff --check` and source-level permission/workflow review are used for this stage.
+- Node.js 22.18 was obtained locally. Dependency installation could not complete because Node's direct registry request fails in this environment; no `node_modules` or configured test database is available. Prisma generation, lint, type checking, tests, build, migrations, and browser journeys remain unverified.

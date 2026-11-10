@@ -422,6 +422,13 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .operations-link-list a:last-child { border-bottom: 0; }
 .operations-link-list span { color: var(--muted); }
 .finance-reconcile { margin-block: 16px; }
+.project-ratings-panel { margin-block: 18px; }
+.rating-row { display: grid; gap: 10px; border-bottom: 1px solid var(--line); padding: 14px 0; }
+.rating-row:last-child { border-bottom: 0; }
+.project-rating-form { max-width: 660px; border-top: 1px solid var(--line); padding-top: 10px; }
+.withdrawal-request-form { align-items: end; border-top: 1px solid var(--line); padding: 13px 0; }
+.withdrawal-request-form label { display: grid; min-width: min(100%, 260px); gap: 5px; color: #454c48; font-size: 11px; font-weight: 700; }
+.withdrawal-request-form input { min-height: 38px; border: 1px solid #d9d4ca; border-radius: 4px; padding: 8px 10px; font: inherit; font-size: 12px; }
 .finance-actions { display: grid; gap: 10px; border-block: 1px solid var(--line); padding-block: 12px; }
 .notification-card.unread { border-left: 3px solid var(--accent); }
 .notification-card.read { opacity: .8; }
