@@ -272,7 +272,7 @@ export async function saveWorkstreamEdits(_state: { error?: string; success?: st
     deliverables: z.array(z.string().trim().min(2).max(180)).max(12),
     dependencies: z.array(z.string().trim().min(2).max(180)).max(8),
     assumptions: z.array(z.string().trim().min(2).max(300)).max(8),
-    rationale: z.string().trim().max(500).optional(),
+    rationale: z.string().trim().max(500).nullish(),
   }).strict()).max(12).safeParse(decodedPlan);
   if (!input.success) return { error: "Review the workstream details and try again." };
   const ids = input.data.flatMap((stream) => stream.id ? [stream.id] : []);
