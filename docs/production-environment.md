@@ -43,7 +43,11 @@ GOOGLE_CLIENT_SECRET=""
 PAYMENT_MODE="simulated"
 PAYMENT_PROVIDER_NAME="UNCONFIGURED"
 PAYMENT_WEBHOOK_SECRET=""
+PLATFORM_FEE_BPS="0"
+PLATFORM_FEE_PAYER="BUSINESS"
 ```
+
+`PLATFORM_FEE_BPS` is expressed in basis points (`1000` = 10%). It remains `0` until Kintovo's fee policy, transaction persistence, provider settlement, refunds, and customer disclosures are implemented and approved. Do not treat this environment value alone as a live fee charge.
 
 The URLs above are shapes/examples only. Copy Neon’s pooled URL into `DATABASE_URL` for the app and its direct/unpooled URL into `DIRECT_URL` for Prisma CLI migrations. This repository's Prisma 7 config now reads `DIRECT_URL` for migrations; the runtime Prisma adapter reads `DATABASE_URL`. Use `sslmode=verify-full` explicitly; it preserves the current certificate-verifying behaviour and avoids the `pg-connection-string` deprecation warning. Do not add quote characters around values in Vercel's environment-variable form. Use separate databases/branches for Preview and Production so preview deployments cannot modify production data. Prisma recommends pooled connections for serverless app traffic and direct connections for migrations. [Prisma connection guidance](https://www.prisma.io/docs/orm/v7/prisma-client/setup-and-configuration/databases-connections)
 

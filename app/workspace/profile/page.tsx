@@ -8,11 +8,12 @@ import { ProfileForm, type ProfileValues } from "./ProfileForm";
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ context?: string }> }) {
   const user = await requireUser();
   const { context: requestedContext } = await searchParams;
-  const [specialist, creator] = await Promise.all([
+  const [specialist, creator, businessMembership] = await Promise.all([
     db.professionalProfile.findUnique({ where: { userId: user.id }, include: { portfolio: { orderBy: { createdAt: "asc" } } } }),
     db.creatorProfile.findUnique({ where: { userId: user.id } }),
+    db.organisationMembership.findFirst({ where: { userId: user.id }, select: { id: true } }),
   ]);
-  if (!specialist && !creator) redirect("/workspace/organisations");
+  if (!specialist && !creator && businessMembership) redirect("/workspace/organisations");
   const context: "SPECIALIST" | "CREATOR" = specialist ? "SPECIALIST" : creator ? "CREATOR" : requestedContext === "CREATOR" ? "CREATOR" : "SPECIALIST";
   const profile: ProfileValues = context === "SPECIALIST" ? {
     ...specialist,
