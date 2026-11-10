@@ -25,7 +25,7 @@ export default async function WorkspacePage() {
   });
   const organisationIds = memberships.map((item) => item.organisationId);
   if (!memberships.length && ["ADMIN", "OPERATIONS", "FINANCE"].includes(user.platformRole)) redirect("/workspace/operations");
-  const [projects, specialist, creator, draftCount, reviewCount, activeCount] = await Promise.all([
+  const [projects, specialist, creator, draftCount, reviewCount, activeCount, specialistEngagements, specialistTasks, creatorCampaigns, creatorContent] = await Promise.all([
     organisationIds.length
       ? db.project.findMany({ where: { organisationId: { in: organisationIds } }, include: { brief: true }, orderBy: { updatedAt: "desc" }, take: 6 })
       : Promise.resolve([]),
@@ -34,6 +34,10 @@ export default async function WorkspacePage() {
     organisationIds.length ? db.project.count({ where: { organisationId: { in: organisationIds }, status: "DRAFT" } }) : Promise.resolve(0),
     organisationIds.length ? db.project.count({ where: { organisationId: { in: organisationIds }, status: { in: ["SUBMITTED", "IN_REVIEW"] } } }) : Promise.resolve(0),
     organisationIds.length ? db.project.count({ where: { organisationId: { in: organisationIds }, status: { in: ["ACTIVE", "MATCHING"] } } }) : Promise.resolve(0),
+    db.engagement.count({ where: { professional: { userId: user.id }, status: { notIn: ["CANCELLED", "COMPLETED"] } } }),
+    db.projectTask.count({ where: { assignee: { userId: user.id }, status: { in: ["TODO", "IN_PROGRESS", "BLOCKED", "SUBMITTED"] } } }),
+    db.campaignCreator.count({ where: { creator: { userId: user.id }, status: { notIn: ["DECLINED", "COMPLETED"] } } }),
+    db.campaignContent.count({ where: { campaignCreator: { creator: { userId: user.id } }, status: { in: ["SUBMITTED", "REVISION_REQUESTED"] } } }),
   ]);
 
   const firstName = user.name.trim().split(/\s+/)[0] || "there";
@@ -87,14 +91,20 @@ export default async function WorkspacePage() {
       </div>
     </section>}
 
-    {!hasBusiness && hasProfessional && <section className="role-dashboard-grid" aria-label="Specialist workspace">
-      <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Specialist work</span><h2>Find the right opportunity</h2><p>Review invitations, compare proposals, and keep your professional profile ready for matching.</p><div className="empty-actions"><Link className="button button-primary button-small" href="/workspace/opportunities">View opportunities</Link><Link className="button button-secondary button-small" href="/workspace/profile/trust">Manage evidence</Link></div></div></article>
+    {hasProfessional && <section className="role-dashboard-section" aria-label="Specialist workspace">
+      <div className="dashboard-section-heading"><div><span className="welcome-label">Specialist workspace</span><h2>Professional work</h2></div><Link className="text-link" href="/workspace/professional">Open professional home <span aria-hidden="true">→</span></Link></div>
+      <div className="metric-grid role-metric-grid"><article className="metric"><span>Open opportunities</span><strong>{specialistEngagements}</strong><small>Invitations and active engagements</small></article><article className="metric"><span>Tasks needing attention</span><strong>{specialistTasks}</strong><small>Assigned delivery tasks</small></article></div>
+      <div className="role-dashboard-grid"><article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Next step</span><h2>Find the right opportunity</h2><p>Review invitations, compare proposals, and keep your professional profile ready for matching.</p><div className="empty-actions"><Link className="button button-primary button-small" href="/workspace/opportunities">View opportunities</Link><Link className="button button-secondary button-small" href="/workspace/profile/trust">Manage evidence</Link></div></div></article>
       <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Profile readiness</span><h2>{specialist?.onboardingCompletedAt ? "Submitted for review" : "Complete your profile"}</h2><p>{specialist?.onboardingCompletedAt ? "Your profile is in the review workflow. Keep your availability and work samples current." : "Add your skills, experience, availability, and public work samples before submitting."}</p><Link className="text-link" href="/workspace/profile?context=SPECIALIST">Open specialist profile <span aria-hidden="true">→</span></Link></div></article>
+      </div>
     </section>}
 
-    {!hasBusiness && hasCreator && <section className="role-dashboard-grid" aria-label="Creator workspace">
-      <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Creator work</span><h2>Manage campaign opportunities</h2><p>Review invitations, prepare content, and keep track of referral activity and approved conversions.</p><div className="empty-actions"><Link className="button button-primary button-small" href="/workspace/campaigns">Open campaigns</Link><Link className="button button-secondary button-small" href="/workspace/opportunities">View opportunities</Link></div></div></article>
+    {hasCreator && <section className="role-dashboard-section" aria-label="Creator workspace">
+      <div className="dashboard-section-heading"><div><span className="welcome-label">Creator workspace</span><h2>Campaign work</h2></div><Link className="text-link" href="/workspace/campaigns">Open campaigns <span aria-hidden="true">→</span></Link></div>
+      <div className="metric-grid role-metric-grid"><article className="metric"><span>Campaign opportunities</span><strong>{creatorCampaigns}</strong><small>Invitations and active campaigns</small></article><article className="metric"><span>Content needing review</span><strong>{creatorContent}</strong><small>Submitted or changes requested</small></article></div>
+      <div className="role-dashboard-grid"><article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Next step</span><h2>Manage campaign opportunities</h2><p>Review invitations, prepare content, and keep track of referral activity and approved conversions.</p><div className="empty-actions"><Link className="button button-primary button-small" href="/workspace/campaigns">Open campaigns</Link><Link className="button button-secondary button-small" href="/workspace/profile?context=CREATOR">Edit profile</Link></div></div></article>
       <article className="panel role-dashboard-card"><div className="panel-content"><span className="welcome-label">Profile readiness</span><h2>{creator?.onboardingCompletedAt ? "Submitted for review" : "Complete your creator profile"}</h2><p>{creator?.onboardingCompletedAt ? "Your creator profile is in the review workflow. Keep channels and audience context current." : "Add your content categories, platforms, and optional audience evidence before submitting."}</p><Link className="text-link" href="/workspace/profile?context=CREATOR">Open creator profile <span aria-hidden="true">→</span></Link></div></article>
+      </div>
     </section>}
 
     {hasBusiness && <>
