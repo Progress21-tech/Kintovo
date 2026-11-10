@@ -17,6 +17,7 @@ const conversationOutputSchema = scopePlanSchema.extend({
 });
 
 export type ScopeChatMessage = { role: "user" | "assistant"; content: string };
+type ScopeProviderError = "not_configured" | "authentication_failed" | "rate_limited" | "invalid_request" | "invalid_response" | "provider_unavailable" | "timeout" | "provider_failed";
 export type ScopeInput = {
   objective: string;
   targetMarket?: string | null;
@@ -46,12 +47,12 @@ export function isScopeAiConfigured() {
   return ["gemini", "compatible"].includes(provider) && Boolean(apiUrl && apiKey && model);
 }
 
-async function requestStructuredResponse(messages: { role: "system" | "user" | "assistant"; content: string }[]) {
+async function requestStructuredResponse(messages: { role: "system" | "user" | "assistant"; content: string }[]): Promise<{ decoded: unknown; error?: undefined } | { error: ScopeProviderError }> {
   const { provider, apiUrl, apiKey, model } = providerConfig();
   if (!isScopeAiConfigured()) return { error: "not_configured" as const };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -59,23 +60,42 @@ async function requestStructuredResponse(messages: { role: "system" | "user" | "
       signal: controller.signal,
       body: JSON.stringify({
         model,
-        temperature: 0.25,
         max_tokens: 5000,
         response_format: { type: "json_object" },
         messages,
       }),
     });
     if (!response.ok) {
-      console.error(`[Kintovo scope] provider=${provider} model=${model} outcome=http_${response.status}`);
-      return { error: "provider_failed" as const };
+      const error: ScopeProviderError = response.status === 401 || response.status === 403
+        ? "authentication_failed"
+        : response.status === 429
+          ? "rate_limited"
+          : response.status === 400
+            ? "invalid_request"
+            : response.status >= 500
+              ? "provider_unavailable"
+              : "provider_failed";
+      console.error(`[Kintovo scope] provider=${provider} model=${model} outcome=${error} status=${response.status}`);
+      return { error };
     }
-    const payload: unknown = await response.json();
-    const text = z.object({ choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1) }).parse(payload).choices[0].message.content;
-    const decoded: unknown = JSON.parse(text);
+    const payload: unknown = await response.json().catch(() => null);
+    const completion = z.object({ choices: z.array(z.object({ message: z.object({ content: z.string() }) })).min(1) }).safeParse(payload);
+    if (!completion.success) {
+      console.error(`[Kintovo scope] provider=${provider} model=${model} outcome=invalid_response_shape`);
+      return { error: "invalid_response" };
+    }
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(completion.data.choices[0].message.content);
+    } catch {
+      console.error(`[Kintovo scope] provider=${provider} model=${model} outcome=invalid_json`);
+      return { error: "invalid_response" };
+    }
     return { decoded };
   } catch (error) {
-    console.error(`[Kintovo scope] provider=${provider} model=${model} outcome=failed`, error instanceof Error ? error.name : "unknown");
-    return { error: "provider_failed" as const };
+    const code = error instanceof Error && error.name === "AbortError" ? "timeout" : "provider_failed";
+    console.error(`[Kintovo scope] provider=${provider} model=${model} outcome=${code}`, error instanceof Error ? error.name : "unknown");
+    return { error: code };
   } finally {
     clearTimeout(timeout);
   }
@@ -109,7 +129,7 @@ export async function generateScopePlan(input: ScopeInput, conversation: ScopeCh
     ...(currentPlan ? [{ role: "assistant" as const, content: `The current provisional plan from the brainstorming step is:\n${JSON.stringify(currentPlan)}` }] : []),
     { role: "user", content: "Using the project brief and brainstorming conversation above, draft the final scope plan. Return only the requested JSON object." },
   ]);
-  if ("error" in result) return { plan: null, source: "RULES_V1", promptVersion: SCOPE_PROMPT_VERSION, error: result.error };
+  if (result.error) return { plan: null, source: "RULES_V1", promptVersion: SCOPE_PROMPT_VERSION, error: result.error === "not_configured" ? "not_configured" : "provider_failed" };
   const parsed = scopePlanSchema.safeParse(result.decoded);
   if (!parsed.success) {
     console.error(`[Kintovo scope] prompt=${SCOPE_PROMPT_VERSION} outcome=invalid_plan`);
@@ -119,7 +139,7 @@ export async function generateScopePlan(input: ScopeInput, conversation: ScopeCh
   return { plan: parsed.data, source: "AI_COMPATIBLE", promptVersion: SCOPE_PROMPT_VERSION };
 }
 
-export async function brainstormScope(input: ScopeInput, conversation: ScopeChatMessage[], message: string, currentPlan?: ScopePlan): Promise<{ reply: string; plan: ScopePlan } | { error: "not_configured" | "provider_failed" }> {
+export async function brainstormScope(input: ScopeInput, conversation: ScopeChatMessage[], message: string, currentPlan?: ScopePlan): Promise<{ reply: string; plan: ScopePlan } | { error: ScopeProviderError }> {
   const result = await requestStructuredResponse([
     { role: "system", content: `${planningInstructions} You are in a focused workstream-planning conversation, not a general chatbot. Read the whole brief first. Ask at most one concise clarifying question when an answer could materially change the workstreams; otherwise explain your recommendation and tradeoffs. On every turn, provide a provisional structured plan the user can later edit. Return JSON with reply, workstreams, questions, assumptions. Each workstream needs name, description, capabilities, recommendedRoles, deliverables, dependencies, assumptions, and a short rationale.` },
     { role: "user", content: `Current project brief:\n${JSON.stringify(briefContext(input))}` },

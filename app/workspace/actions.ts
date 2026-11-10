@@ -191,7 +191,19 @@ export async function brainstormScopePlan(rawInput: unknown) {
     additionalInformation: parsed.data.additionalInformation,
   };
   const result = await getScopeBrainstorm(input, parsed.data.conversation, parsed.data.message, parsed.data.currentPlan ?? undefined);
-  if ("error" in result) return { error: "The AI could not complete that scope brainstorm. Try again in a moment." } as const;
+  if ("error" in result) {
+    const messages = {
+      not_configured: "AI planning is not configured. Ask the platform administrator to check the AI settings.",
+      authentication_failed: "The AI provider rejected its API key. Ask the platform administrator to check AI_API_KEY in Vercel.",
+      rate_limited: "The AI provider's free-tier quota or rate limit has been reached. Try again later or check its usage limits.",
+      invalid_request: "The AI provider rejected the model request. Ask the platform administrator to check the model and API endpoint settings.",
+      invalid_response: "The AI provider returned an unreadable plan. Try sending your message again.",
+      provider_unavailable: "The AI provider is temporarily unavailable. Try again shortly.",
+      timeout: "The AI provider took too long to respond. Try again with a shorter message.",
+      provider_failed: "The AI provider could not be reached. Try again shortly.",
+    };
+    return { error: messages[result.error] } as const;
+  }
   return { result } as const;
 }
 

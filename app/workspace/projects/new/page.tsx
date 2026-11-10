@@ -6,6 +6,8 @@ import { BriefForm } from "./BriefForm";
 import { platformFlag } from "@/server/settings";
 import { isScopeAiConfigured } from "@/server/scope-service";
 
+export const maxDuration = 60;
+
 export default async function NewProjectPage() {
   const user = await requireUser();
   const memberships = await db.organisationMembership.findMany({ where: { userId: user.id, role: { in: ["OWNER", "ADMIN", "PROJECT_MANAGER"] } }, include: { organisation: { select: { id: true, name: true } } }, orderBy: { createdAt: "asc" } });
