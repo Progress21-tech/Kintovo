@@ -55,6 +55,8 @@ To generate a secret in PowerShell, run:
 
 Paste the resulting value directly into Vercel's `AUTH_SECRET` field. Do not paste it into chat, commit it, or put it in `.env.example`.
 
+`AUTH_SECRET` is required for Auth.js sessions and Google OAuth. If it is empty or missing, sign-in and OAuth callbacks will fail. Generate it once, store it in the appropriate Vercel environments, and redeploy after adding it.
+
 ## Cloudflare setup
 
 - Add and verify your domain in Cloudflare, then use Cloudflare's nameservers at your domain registrar if Cloudflare will manage DNS.

@@ -3,8 +3,9 @@
 import { useActionState } from "react";
 import { useState } from "react";
 import { registerAccount } from "./actions";
+import { signIn } from "next-auth/react";
 
-export function RegisterForm({ initialContext = "BUSINESS" }: { initialContext?: "BUSINESS" | "SPECIALIST" | "CREATOR" }) {
+export function RegisterForm({ initialContext = "BUSINESS", googleConfigured = false }: { initialContext?: "BUSINESS" | "SPECIALIST" | "CREATOR"; googleConfigured?: boolean }) {
   const [state, action, pending] = useActionState(registerAccount, {});
   const [context, setContext] = useState(initialContext);
   return (
@@ -30,6 +31,7 @@ export function RegisterForm({ initialContext = "BUSINESS" }: { initialContext?:
       {state.error && <p className="form-alert" role="alert">{state.error}</p>}
       {state.success && <p className="form-success" role="status">{state.success}</p>}
       <button className="button button-primary button-wide" disabled={pending}>{pending ? "Creating account…" : "Create account"}</button>
+      {googleConfigured && <><div className="auth-divider"><span>or</span></div><button className="button button-secondary button-wide" type="button" onClick={() => signIn("google", { callbackUrl: "/google-onboarding" })}>Continue with Google</button></>}
       <p className="field-note">By creating an account you acknowledge that the Terms and Privacy pages are draft documents awaiting legal review.</p>
     </form>
   );

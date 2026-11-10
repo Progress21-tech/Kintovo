@@ -34,6 +34,6 @@ export function SignInForm({ googleConfigured = false }: { googleConfigured?: bo
     {error && <p className="form-alert" role="alert">{error}</p>}
     <button className="button button-primary button-wide" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
     {googleConfigured && <><div className="auth-divider"><span>or</span></div>
-      <button className="button button-secondary button-wide" type="button" onClick={() => signIn("google", { callbackUrl: "/workspace" })}><GoogleMark />Continue with Google</button></>}
+      <button className="button button-secondary button-wide" type="button" onClick={() => signIn("google", { callbackUrl: "/google-onboarding" })}><GoogleMark />Continue with Google</button></>}
   </form>;
 }
