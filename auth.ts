@@ -19,7 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const forwarded = request.headers.get("x-forwarded-for");
         const ip = (forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown").slice(0, 100);
         if (!await rateLimitLogin(emailKey, ip)) return null;
-        const parsed = z.object({ email: z.email(), password: z.string().min(1) }).safeParse(credentials);
+        const parsed = z.object({ email: z.email().trim(), password: z.string().min(1) }).safeParse(credentials);
         if (!parsed.success) return null;
         const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
         if (!user || user.disabledAt || (requireEmailVerification && !user.emailVerifiedAt)) return null;
