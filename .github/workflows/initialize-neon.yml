@@ -1,0 +1,67 @@
+name: Initialize Neon database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_empty_database:
+        description: "Choose yes only after confirming the Neon database has no existing Kintovo tables or data."
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
+
+permissions:
+  contents: write
+
+jobs:
+  initialize:
+    if: ${{ inputs.confirm_empty_database == 'yes' }}
+    runs-on: ubuntu-latest
+    env:
+      DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.18.0"
+
+      - name: Check required database secret
+        run: |
+          if [ -z "$DIRECT_URL" ]; then
+            echo "Repository secret NEON_DIRECT_URL is missing."
+            exit 1
+          fi
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate the initial migration
+        id: migration
+        run: |
+          if compgen -G 'prisma/migrations/*/migration.sql' > /dev/null; then
+            echo "Prisma migration files already exist; refusing to replace migration history."
+            exit 1
+          fi
+          migration_name="$(date -u +%Y%m%d%H%M%S)_init"
+          mkdir -p "prisma/migrations/$migration_name"
+          npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script --output "prisma/migrations/$migration_name/migration.sql"
+          printf 'provider = "postgresql"\n' > prisma/migrations/migration_lock.toml
+          echo "name=$migration_name" >> "$GITHUB_OUTPUT"
+
+      - name: Commit migration to the selected branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prisma/migrations
+          git commit -m "Add initial Prisma migration"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Apply migration to Neon
+        run: npx prisma migrate deploy
