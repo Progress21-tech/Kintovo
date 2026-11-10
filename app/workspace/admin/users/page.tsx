@@ -21,7 +21,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     },
     include: {
       memberships: { include: { organisation: { select: { name: true } } } },
-      specialist: { select: { onboardingCompletedAt: true, isPublished: true, verificationStatus: true } },
+      specialist: { select: { onboardingCompletedAt: true, isPublished: true, verificationStatus: true, expertiseLevel: true } },
       creator: { select: { onboardingCompletedAt: true, isPublished: true, verificationStatus: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -72,7 +72,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         const status = person.bannedAt ? "Permanently banned" : person.disabledAt ? "Temporarily suspended" : "Enabled";
         const contexts = [
           ...person.memberships.map((membership) => `Business · ${membership.organisation.name} (${membership.role.toLowerCase().replaceAll("_", " ")})`),
-          person.specialist ? `Specialist · ${person.specialist.isPublished ? "approved and published" : person.specialist.onboardingCompletedAt ? "submitted for review" : "profile incomplete"}` : "",
+          person.specialist ? `Specialist ${person.specialist.expertiseLevel.replaceAll("_", " ")} · ${person.specialist.isPublished ? "approved and published" : person.specialist.onboardingCompletedAt ? "submitted for review" : "profile incomplete"}` : "",
           person.creator ? `Creator · ${person.creator.isPublished ? "approved and published" : person.creator.onboardingCompletedAt ? "submitted for review" : "profile incomplete"}` : "",
         ].filter(Boolean);
         return <article className="panel review-card" key={person.id}>

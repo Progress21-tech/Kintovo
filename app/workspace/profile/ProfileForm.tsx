@@ -6,6 +6,7 @@ import { saveProfile, suggestCreatorProfile, suggestSpecialistProfile } from "./
 
 export type ProfileValues = {
   headline?: string | null; biography?: string | null; city?: string | null;
+  expertiseLevel?: string;
   categories?: string[]; skills?: string[]; languages?: string[]; availability?: string | null;
   indicativeRate?: number | null; yearsExperience?: number | null; marketExperience?: string | null;
   availabilityStatus?: string | null; availableFrom?: Date | null; preferredDuration?: string | null;
@@ -121,7 +122,7 @@ export function ProfileForm({ profile, context }: { profile: ProfileValues; cont
           <label>Preferred project duration<input name="preferredDuration" defaultValue={profile.preferredDuration ?? ""} placeholder="e.g. 2–4 weeks" maxLength={120} /></label>
           <label>Preferred working arrangement<input name="preferredArrangement" defaultValue={profile.preferredArrangement ?? ""} placeholder="Remote, hybrid, on-site" maxLength={120} /></label>
           <label className="span-two">Preferred engagement types<input name="preferredEngagements" defaultValue={(profile.preferredEngagements ?? []).join(", ")} placeholder="Team project, individual engagement" maxLength={300} /></label>
-          <label>Indicative rate in NGN<input type="number" name="rate" min="0" step="1" defaultValue={profile.indicativeRate ?? ""} placeholder="Optional" /></label>
+          <label>Indicative rate in NGN · {profile.expertiseLevel?.replaceAll("_", " ") ?? "LEVEL 1"}<input type="number" name="rate" min="0" step="1" defaultValue={profile.indicativeRate ?? ""} placeholder="Optional" /></label>
           <label className="span-two">Portfolio items <span className="field-note">One per line: title | https://link | your contribution | public. Items remain private unless you add “public”.</span><textarea name="portfolio" defaultValue={profile.portfolio ?? ""} placeholder={"Nigeria audience research | https://example.com/work | Led interviews and synthesis | public"} maxLength={5000} /></label>
         </div>
       </div>

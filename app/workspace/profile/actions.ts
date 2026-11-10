@@ -150,7 +150,11 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
     return { error: "Before review, add a creator description and at least one content category." };
   }
   if (parsed.data.context === "SPECIALIST") {
-    const previous = await db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true, verificationStatus: true } });
+    const previous = await db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true, verificationStatus: true, expertiseLevel: true } });
+    if (rate !== undefined) {
+      const ceiling = await db.rateCeiling.findUnique({ where: { currency_level: { currency: "NGN", level: previous?.expertiseLevel ?? "LEVEL_1" } }, select: { amount: true } });
+      if (ceiling && rate > ceiling.amount) return { error: `Your indicative NGN rate exceeds the configured ceiling for ${previous?.expertiseLevel ?? "LEVEL_1"}.` };
+    }
     const saved = {
       headline: parsed.data.headline || null,
       biography: parsed.data.biography || null,

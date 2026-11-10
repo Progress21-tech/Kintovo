@@ -28,12 +28,16 @@ export async function reviewAssessment(formData: FormData) {
   if (!input.success) return;
   const score = Number(input.data.score);
   if (!Number.isInteger(score) || score < 0 || score > 100) return;
-  const assessment = await db.skillsAssessment.findUnique({ where: { id: input.data.assessmentId }, include: { professional: { select: { userId: true } } } });
+  const assessment = await db.skillsAssessment.findUnique({ where: { id: input.data.assessmentId }, include: { professional: { select: { userId: true, expertiseLevel: true } } } });
   if (!assessment || assessment.status !== "SUBMITTED") return;
+  const levels = ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"] as const;
+  const currentLevelIndex = levels.indexOf(assessment.professional.expertiseLevel);
+  const awardedLevel = input.data.status === "APPROVED" ? levels[Math.min(levels.length - 1, currentLevelIndex + 1)] : assessment.professional.expertiseLevel;
   await db.$transaction(async (tx) => {
     await tx.skillsAssessment.update({ where: { id: assessment.id }, data: { status: input.data.status, score, reviewerId: user.id, reviewerNote: input.data.reviewerNote, reviewedAt: new Date() } });
-    await tx.notification.create({ data: { userId: assessment.professional.userId, title: `Assessment ${input.data.status.toLowerCase()}`, body: `${input.data.reviewerNote} Score: ${score}/100.` } });
-    await tx.auditLog.create({ data: { actorId: user.id, action: `SKILLS_ASSESSMENT_${input.data.status}`, entityType: "SkillsAssessment", entityId: assessment.id, metadata: { score } } });
+    if (input.data.status === "APPROVED") await tx.professionalProfile.update({ where: { id: assessment.professionalProfileId }, data: { expertiseLevel: awardedLevel } });
+    await tx.notification.create({ data: { userId: assessment.professional.userId, title: `Assessment ${input.data.status.toLowerCase()}`, body: `${input.data.reviewerNote} Score: ${score}/100.${input.data.status === "APPROVED" ? ` Specialist level is now ${awardedLevel.replaceAll("_", " ")}.` : ""}` } });
+    await tx.auditLog.create({ data: { actorId: user.id, action: `SKILLS_ASSESSMENT_${input.data.status}`, entityType: "SkillsAssessment", entityId: assessment.id, metadata: { score, awardedLevel } } });
   });
   revalidatePath("/workspace/operations/assessments");
   revalidatePath("/workspace/profile/assessments");

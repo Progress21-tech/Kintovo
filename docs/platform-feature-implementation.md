@@ -78,3 +78,17 @@ Permanent bans retain the account and audit record and block that account from s
 
 - `git diff --check` and source-level permission/workflow review are used for this stage.
 - Node.js 22.18 was obtained locally. Dependency installation could not complete because Node's direct registry request fails in this environment; no `node_modules` or configured test database is available. Prisma generation, lint, type checking, tests, build, migrations, and browser journeys remain unverified.
+
+## Stage 5 — Specialist levels and configurable fee ceilings
+
+### Implemented
+
+- Specialists start at Level 1. Each approved practical assessment advances the Specialist one level, up to Level 4; rejected assessments do not.
+- Admins can configure maximum fees by level and currency from Platform settings. Each fee ceiling change is audit-logged.
+- New proposals and counteroffers are blocked when the corresponding ceiling is missing or the proposed amount exceeds it. Specialist indicative NGN rates are checked when a ceiling is configured.
+- Specialist level and configured NGN ceiling appear in talent discovery; level is also shown in admin account monitoring and assessment assignment.
+- Added a migration for Specialist levels and configurable rate-ceiling records.
+
+### Validation and delivery
+
+- `git diff --check` and source-level review are used for this stage. Automated checks remain blocked because dependency installation cannot reach the npm registry and no database is configured.

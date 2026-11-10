@@ -138,6 +138,12 @@ enum WithdrawalStatus {
   REJECTED
   PAID
 }
+enum SpecialistLevel {
+  LEVEL_1
+  LEVEL_2
+  LEVEL_3
+  LEVEL_4
+}
 enum ChangeRequestStatus {
   PENDING
   ACCEPTED
@@ -288,6 +294,7 @@ model ProfessionalProfile {
   preferredArrangement String?
   preferredEngagements String[]          @default([])
   indicativeRate     Int?
+  expertiseLevel     SpecialistLevel    @default(LEVEL_1)
   yearsExperience    Int?
   marketExperience   String?
   onboardingCompletedAt DateTime?
@@ -907,6 +914,15 @@ model PlatformSetting {
   updatedById String
   updatedAt   DateTime @updatedAt
   @@index([updatedAt])
+}
+
+model RateCeiling {
+  currency    String
+  level       SpecialistLevel
+  amount      Int
+  updatedById String
+  updatedAt   DateTime @updatedAt
+  @@id([currency, level])
 }
 
 model Notification {

@@ -429,6 +429,13 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .withdrawal-request-form { align-items: end; border-top: 1px solid var(--line); padding: 13px 0; }
 .withdrawal-request-form label { display: grid; min-width: min(100%, 260px); gap: 5px; color: #454c48; font-size: 11px; font-weight: 700; }
 .withdrawal-request-form input { min-height: 38px; border: 1px solid #d9d4ca; border-radius: 4px; padding: 8px 10px; font: inherit; font-size: 12px; }
+.rate-ceiling-list { display: grid; }
+.rate-ceiling-row { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(170px, 260px) auto; align-items: end; gap: 12px; border-bottom: 1px solid var(--line); padding: 12px 0; }
+.rate-ceiling-row:last-child { border-bottom: 0; }
+.rate-ceiling-row strong, .rate-ceiling-row label { font-size: 11px; }
+.rate-ceiling-row label { display: grid; gap: 5px; color: #454c48; font-weight: 700; }
+.rate-ceiling-row input { min-height: 38px; border: 1px solid #d9d4ca; border-radius: 4px; padding: 8px 10px; font: inherit; font-size: 12px; }
+@media (max-width: 680px) { .rate-ceiling-row { grid-template-columns: 1fr; } }
 .finance-actions { display: grid; gap: 10px; border-block: 1px solid var(--line); padding-block: 12px; }
 .notification-card.unread { border-left: 3px solid var(--accent); }
 .notification-card.read { opacity: .8; }

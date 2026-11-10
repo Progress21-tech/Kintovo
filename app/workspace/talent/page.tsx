@@ -26,6 +26,7 @@ export default async function TalentPage({ searchParams }: { searchParams: Promi
     profileUserIds.length ? db.engagementRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: profileUserIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
     profileUserIds.length ? db.campaignRating.groupBy({ by: ["revieweeId"], where: { revieweeId: { in: profileUserIds } }, _avg: { rating: true }, _count: { _all: true } }) : Promise.resolve([]),
   ]);
+  const rateCeilings = profileUserIds.length ? await db.rateCeiling.findMany({ where: { currency: "NGN", level: { in: [...new Set(profiles.map((profile) => profile.expertiseLevel))] } } }) : [];
   const reputation = new Map<string, { sum: number; count: number }>();
   for (const item of [...reviewStats, ...campaignReviewStats]) {
     const current = reputation.get(item.revieweeId) ?? { sum: 0, count: 0 };
@@ -68,6 +69,7 @@ export default async function TalentPage({ searchParams }: { searchParams: Promi
       <h3>{profile.user.name}</h3><p>{profile.headline ?? "Independent professional"} · {[profile.city, profile.country].filter(Boolean).join(", ")}</p>
       <div className="talent-tags">{profile.categories.slice(0, 4).map((item) => <span className="chip" key={item}>{item}</span>)}{profile.skills.slice(0, 5).map((item) => <span className="chip" key={item}>{item}</span>)}</div>
       <div className="talent-meta"><span className="status-pill green">Profile reviewed</span>{reputation.has(profile.userId) && <span className="status-pill blue">{(reputation.get(profile.userId)!.sum / reputation.get(profile.userId)!.count).toFixed(1)}/5 · {reputation.get(profile.userId)!.count} ratings</span>}{match && <span className="status-pill blue">{match.reasons.length} fit signals</span>}<span className="field-note">{profile.availabilityStatus.replaceAll("_", " ")}{profile.availability ? ` · ${profile.availability}` : ""}</span></div>
+      <p className="field-note">Specialist level: {profile.expertiseLevel.replaceAll("_", " ")} · maximum NGN proposal {rateCeilings.find((ceiling) => ceiling.level === profile.expertiseLevel)?.amount.toLocaleString("en-NG") ?? "not configured"}</p>
       {profile.marketExperience && <p className="talent-market">Market experience: {profile.marketExperience}</p>}
       {profile.trustReviews.length > 0 && <div className="talent-tags">{profile.trustReviews.map((review) => <span className="chip" key={review.dimension}>{review.dimension.replaceAll("_", " ")} reviewed</span>)}</div>}
       {match && <div className="match-explanation"><strong>Why this may fit</strong>{match.reasons.length ? <ul>{match.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul> : <p>No positive fit signals were identified yet.</p>}{match.gaps.length > 0 && <details><summary>Information not confirmed</summary><ul>{match.gaps.map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}</div>}

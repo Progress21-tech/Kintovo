@@ -21,6 +21,21 @@ export async function updatePlatformSetting(formData: FormData) {
   revalidatePath("/workspace/campaigns");
 }
 
+export async function saveRateCeiling(formData: FormData) {
+  const user = await requireUser();
+  if (user.platformRole !== "ADMIN") redirect("/workspace");
+  const parsed = z.object({ currency: z.enum(["NGN", "USD", "GBP", "EUR"]), level: z.enum(["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"]), amount: z.string() }).safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const amount = Number(parsed.data.amount);
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > 2_147_483_647) return;
+  await db.$transaction([
+    db.rateCeiling.upsert({ where: { currency_level: { currency: parsed.data.currency, level: parsed.data.level } }, create: { currency: parsed.data.currency, level: parsed.data.level, amount, updatedById: user.id }, update: { amount, updatedById: user.id } }),
+    db.auditLog.create({ data: { actorId: user.id, action: "SPECIALIST_RATE_CEILING_UPDATED", entityType: "RateCeiling", entityId: `${parsed.data.currency}_${parsed.data.level}`, metadata: { amount } } }),
+  ]);
+  revalidatePath("/workspace/operations/settings");
+  revalidatePath("/workspace/talent");
+}
+
 export async function reviewBrief(formData: FormData) {
   const user = await requireUser();
   if (user.platformRole !== "ADMIN" && user.platformRole !== "OPERATIONS") redirect("/workspace");

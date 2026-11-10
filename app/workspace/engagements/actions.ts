@@ -63,8 +63,11 @@ export async function submitProposal(_state: { error?: string; success?: string 
   const dueAt = parsed.data.deadline ? new Date(`${parsed.data.deadline}T12:00:00.000Z`) : null;
   const startAt = parsed.data.estimatedStartAt ? new Date(`${parsed.data.estimatedStartAt}T12:00:00.000Z`) : null;
   if (dueAt && Number.isNaN(dueAt.getTime()) || startAt && Number.isNaN(startAt.getTime())) return { error: "Enter valid proposal dates." };
-  const engagement = await db.engagement.findUnique({ where: { id: parsed.data.engagementId }, include: { project: { select: { id: true, status: true, organisationId: true } }, professional: { select: { id: true, userId: true } }, proposals: { orderBy: { version: "desc" }, take: 1 } } });
+  const engagement = await db.engagement.findUnique({ where: { id: parsed.data.engagementId }, include: { project: { select: { id: true, status: true, organisationId: true } }, professional: { select: { id: true, userId: true, expertiseLevel: true } }, proposals: { orderBy: { version: "desc" }, take: 1 } } });
   if (!engagement || !["INVITED", "PROPOSED", "NEGOTIATING"].includes(engagement.status)) return { error: "This opportunity is no longer open for proposals." };
+  const rateCeiling = await db.rateCeiling.findUnique({ where: { currency_level: { currency: parsed.data.currency, level: engagement.professional.expertiseLevel } }, select: { amount: true } });
+  if (!rateCeiling) return { error: `The platform has not configured a ${parsed.data.currency} fee ceiling for ${engagement.professional.expertiseLevel.replaceAll("_", " ")} yet. Contact Operations before negotiating this offer.` };
+  if (amount > rateCeiling.amount) return { error: `This offer exceeds the ${parsed.data.currency} ${rateCeiling.amount.toLocaleString("en-NG")} fee ceiling for this Specialist level.` };
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: engagement.project.organisationId, userId: user.id } } });
   const isTalent = engagement.professional.userId === user.id;
   const isBuyer = Boolean(membership && canManageProjects(membership.role));
