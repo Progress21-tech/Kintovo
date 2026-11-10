@@ -50,7 +50,7 @@ export function ProfileForm({ profile, context }: { profile: ProfileValues; cont
       });
       if ("error" in result) {
         setSuggestion(null);
-        setAiError(result.error);
+        setAiError(result.error ?? "AI profile suggestions could not be generated. Try again shortly.");
       } else {
         setSuggestion(result.suggestion);
         setAiError("");
@@ -73,7 +73,7 @@ export function ProfileForm({ profile, context }: { profile: ProfileValues; cont
       });
       if ("error" in result) {
         setCreatorSuggestion(null);
-        setCreatorAiError(result.error);
+        setCreatorAiError(result.error ?? "AI profile suggestions could not be generated. Try again shortly.");
       } else {
         setCreatorSuggestion(result.suggestion);
         setCreatorAiError("");
