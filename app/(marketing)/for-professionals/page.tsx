@@ -1,2 +1,5 @@
-import Link from "next/link";
-export default function ForProfessionalsPage() { return <main className="wrap prose-page"><span className="eyebrow">For professionals</span><h1>Your expertise, connected to real project goals.</h1><p className="lead">Build a professional profile that explains your skills, contribution, availability, and local-market experience.</p><h2>Show evidence and context</h2><p>Profiles are intended to make work samples, role-specific skills, and relevant experience easier to review. Verification status is shown only when evidence has been reviewed.</p><h2>Clear scope and terms</h2><p>Review a brief, propose your rate and deliverables, negotiate changes, and keep accepted agreement versions with the engagement.</p><Link className="button button-primary" href="/register?as=specialist">Create a professional account</Link></main>; }
+import { redirect } from "next/navigation";
+
+export default function ForProfessionalsPage() {
+  redirect("/#professionals");
+}

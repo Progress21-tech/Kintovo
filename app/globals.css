@@ -1,5 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
+.audience-section { scroll-margin-top: 28px; }
+
 :root {
   color-scheme: light;
   --paper: #f7f5f0;
