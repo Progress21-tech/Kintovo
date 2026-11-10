@@ -33,6 +33,7 @@ export function WorkspaceNav({ business, specialist, creator, operations, financ
     ...(business || creator ? [{ icon: Megaphone, label: "Campaigns", href: "/workspace/campaigns" }] : []),
     ...(specialist || creator ? [
       { icon: Activity, label: "Professional home", href: "/workspace/professional" },
+      { icon: CircleDollarSign, label: "Earnings", href: "/workspace/earnings" },
       { icon: ShieldCheck, label: "Trust and evidence", href: "/workspace/profile/trust" },
       { icon: BriefcaseBusiness, label: "Opportunities", href: "/workspace/opportunities" },
       { icon: ClipboardCheck, label: "Assessments", href: "/workspace/profile/assessments" },
@@ -49,7 +50,7 @@ export function WorkspaceNav({ business, specialist, creator, operations, financ
     ] : []),
     ...(finance ? [{ icon: CircleDollarSign, label: "Finance operations", href: "/workspace/operations/finance" }] : []),
     ...(finance && !operations ? [{ icon: Megaphone, label: "Campaign review", href: "/workspace/operations/campaigns" }] : []),
-    ...(admin ? [{ icon: Settings, label: "Platform settings", href: "/workspace/operations/settings" }] : []),
+    ...(admin ? [{ icon: Settings, label: "Admin console", href: "/workspace/admin" }, { icon: Settings, label: "Platform settings", href: "/workspace/operations/settings" }] : []),
     ...(specialist || creator ? [{ icon: UserRound, label: "Profile", href: "/workspace/profile" }] : []),
     { icon: Building2, label: "Organisations", href: "/workspace/organisations" },
   ];

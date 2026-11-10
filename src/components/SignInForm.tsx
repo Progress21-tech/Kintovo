@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import Link from "next/link";
 import { useState } from "react";
 import { GoogleMark } from "@/components/GoogleMark";
 
@@ -22,7 +23,7 @@ export function SignInForm({ googleConfigured = false }: { googleConfigured?: bo
   }
   return <form action={submit} className="form-stack">
     <label>Email address<input type="email" name="email" autoComplete="email" required /></label>
-    <label>Password<input type="password" name="password" autoComplete="current-password" required /></label>
+    <label>Password<div className="password-label-row"><span>Password</span><Link href="/forgot-password">Forgot password?</Link></div><input type="password" name="password" autoComplete="current-password" required /></label>
     {error && <p className="form-alert" role="alert">{error}</p>}
     <button className="button button-primary button-wide" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
     {googleConfigured && <><div className="auth-divider"><span>or</span></div>
