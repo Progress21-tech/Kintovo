@@ -15,6 +15,9 @@ function splitList(value: string) { return value.split(",").map((item) => item.t
 export function PlanEditor({ projectId, streams: initialStreams, editable = true }: { projectId: string; streams: EditableStream[]; editable?: boolean }) {
   const [state, action, pending] = useActionState(saveWorkstreamEdits, {});
   const [streams, setStreams] = useState(initialStreams);
+  const planPayload = streams.map(({ id, name, description, capabilities, recommendedRoles, deliverables, dependencies, assumptions, rationale }) => ({
+    id, name, description, capabilities, recommendedRoles, deliverables, dependencies, assumptions, rationale,
+  }));
   type EditableField = "name" | "description" | "capabilities" | "recommendedRoles" | "deliverables" | "dependencies" | "assumptions";
   function update(index: number, field: EditableField, value: string) {
     setStreams((current) => current.map((stream, i) => i === index ? {
@@ -24,7 +27,7 @@ export function PlanEditor({ projectId, streams: initialStreams, editable = true
   }
   return <form action={action} className="panel-content">
     <input type="hidden" name="projectId" value={projectId} />
-    <input type="hidden" name="plan" value={JSON.stringify(streams)} />
+    <input type="hidden" name="plan" value={JSON.stringify(planPayload)} />
     {streams.length ? <div className="workstream-list">{streams.map((stream, index) => <fieldset className="workstream workstream-editor" key={stream.id ?? `new-${index}`}>
       <legend>Workstream {index + 1}</legend>
       <label>Name<input value={stream.name} onChange={(event) => update(index, "name", event.target.value)} required maxLength={120} disabled={!editable} /></label>
