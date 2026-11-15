@@ -11,7 +11,7 @@ const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== "fal
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
-  pages: { signIn: "/sign-in" },
+  pages: { signIn: "/sign-in", error: "/sign-in" },
   providers: [
     Credentials({
       name: "Email and password",
@@ -38,9 +38,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;
       const email = user.email?.trim().toLowerCase();
-      if (!email || profile && "email_verified" in profile && profile.email_verified === false) return false;
+      if (!email) return "/sign-in?notice=google-email-missing";
+      if (profile && "email_verified" in profile && profile.email_verified === false) {
+        return "/sign-in?notice=google-email-unverified";
+      }
       const existing = await db.user.findUnique({ where: { email } });
-      if (existing?.disabledAt || existing?.bannedAt) return false;
+      if (existing?.disabledAt || existing?.bannedAt) return "/sign-in?notice=account-unavailable";
       const persisted = existing ?? await db.user.create({
         data: {
           name: user.name?.trim() || email.split("@")[0],
