@@ -19,8 +19,8 @@ AUTH_SECRET="GENERATE_A_UNIQUE_RANDOM_SECRET"
 AUTH_URL="https://YOUR_PROJECT.vercel.app"
 AUTH_TRUST_HOST="true"
 
-# Users must verify their email before signing in.
-REQUIRE_EMAIL_VERIFICATION="true"
+# Email verification is optional; set this to "true" only when SMTP delivery is configured.
+REQUIRE_EMAIL_VERIFICATION="false"
 
 # SMTP provider credentials. Required for production signup and password recovery.
 SMTP_HOST="YOUR_SMTP_HOST"
@@ -71,7 +71,7 @@ Paste the resulting value directly into Vercel's `AUTH_SECRET` field. Do not pas
 
 ## SMTP verification checklist
 
-With `REQUIRE_EMAIL_VERIFICATION=true`, users receive a verification email after registration and cannot sign in until they use the link. The registration form fails closed in production when `SMTP_HOST` or `EMAIL_FROM` is missing. Configure all Resend SMTP variables in the deployed environment, then redeploy because Vercel environment changes apply to new deployments. Use a sender address allowed by the verified Resend domain and set `SMTP_USER=resend` and `SMTP_PASSWORD` to the Resend API key.
+With `REQUIRE_EMAIL_VERIFICATION=true`, users receive a verification email after registration and cannot sign in until they use the link. Leave it set to `false` for the default product flow, which does not require email verification. If enabling it, the registration form fails closed in production when `SMTP_HOST` or `EMAIL_FROM` is missing. Configure all Resend SMTP variables in the deployed environment, then redeploy because Vercel environment changes apply to new deployments. Use a sender address allowed by the verified Resend domain and set `SMTP_USER=resend` and `SMTP_PASSWORD` to the Resend API key.
 
 ## Google OAuth
 
@@ -79,7 +79,7 @@ Create a Google OAuth Web application and add this authorised redirect URI:
 
 `https://YOUR-AUTH-URL.vercel.app/api/auth/callback/google`
 
-Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the same Vercel environment as `AUTH_URL`, then redeploy. Google-verified accounts are treated as email-verified; email/password accounts still require the Kintovo verification email. Google sign-in creates an account without a password, so the user must continue using Google for that account.
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the same Vercel environment as `AUTH_URL`, then redeploy. Google-verified accounts are treated as email-verified. Google sign-in creates an account without a password, so the user must continue using Google for that account.
 
 ## AI scope planning
 

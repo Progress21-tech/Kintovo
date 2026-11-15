@@ -12,16 +12,16 @@ This is a deployment preparation guide, not a claim that the current repository 
 
 ## First database setup
 
-There is no committed `prisma/migrations` directory yet. Do this in a development environment with Node.js and a disposable PostgreSQL database:
+Committed migrations are under `prisma/migrations`. Validate them against a disposable PostgreSQL database:
 
 1. Copy `.env.example` to `.env` and set a local `DATABASE_URL`.
 2. Install dependencies with `npm install`; commit the generated lockfile so deployment can use `npm ci`.
 3. Run `npm run db:generate` and resolve any Prisma schema errors.
-4. Create the initial migration with `npm run db:migrate -- --name init`.
-5. Review the generated SQL, apply it to a fresh database, run the test/build commands, then commit `prisma/migrations`.
+4. Apply committed migrations to a fresh database with `npm run db:migrate` in development.
+5. Review future migration SQL and run the test/build commands.
 6. Do not point `migrate dev` at production. Production releases should use `npm run db:deploy` after the migration has been reviewed and committed.
 
-The schema has changed through the initial development phases and still needs the first migration generated. Back up any database with valuable data before schema changes.
+Back up any database with valuable data before schema changes.
 
 ## Environment configuration
 
@@ -37,7 +37,8 @@ Optional integrations:
 
 - `AI_PROVIDER`, `AI_API_BASE_URL`, `AI_MODEL`, `AI_API_KEY`: use only after provider security/privacy review. AI scoping is opt-in per brief and must remain editable.
 - `OBJECT_STORAGE_*`: currently unused. Do not collect private deliverables until storage access controls, expiry, scanning, and deletion are implemented.
-- `PAYMENT_MODE` must remain `simulated`. `PAYMENT_PROVIDER_NAME` and `PAYMENT_WEBHOOK_SECRET` do not enable a provider adapter. The generic webhook route is disabled in simulated mode and is not compatible with a provider's actual callback format until a provider-specific adapter and verification logic are written and reviewed.
+- `PAYMENT_MODE` must remain `simulated`. `PAYMENT_PROVIDER_NAME` and `PAYMENT_WEBHOOK_SECRET` do not enable a provider adapter. The generic webhook route is disabled in simulated mode and is not compatible with Paga callbacks.
+- Paga settings are documented in [the Paga integration audit](./paga-integration-audit.md). Keep `PAGA_ENABLE_SANDBOX=false`; the SHA-512/configuration boundary is not a payment adapter, and no Paga API operation is enabled. Live operations are explicitly disabled in code.
 
 Never put production secrets in `.env.example`, source control, client code, logs, or campaign content.
 
@@ -65,16 +66,15 @@ The app sets baseline browser security headers in `next.config.ts`, including HS
 
 ## Payment provider evaluation (reviewed 2026-11-09)
 
-No provider was selected or integrated. Obtain written product/commercial approval and complete legal, regulatory, operational, reconciliation, and support reviews before implementation.
+Paga is the requested provider and its documented integration boundary has been reviewed; no Paga money movement endpoint has been integrated or enabled. Obtain written product/commercial approval and complete legal, regulatory, operational, reconciliation, and support reviews before enabling any flow.
 
-- **Paga Engine:** its official documentation describes Nigerian bank/Paga-wallet payouts from a Paga business balance, account validation, status callbacks, and sandbox/live environments with separate credentials. It uses Paga-specific SHA-512 request/callback hashing and IP allowlisting. Build a Paga-specific adapter and callback verifier; the generic SHA-256 example route in this repo must not be used for Paga. See [Money Transfer](https://developer-docs.paga.com/docs/money-transfer-payout), [Hash handling](https://developer-docs.paga.com/docs/handling-hash), and [Get started](https://developer-docs.paga.com/docs/get-started).
+- **Paga Engine:** its official documentation describes Nigerian bank/Paga-wallet payouts from a Paga business balance, account validation, status callbacks, and sandbox/live environments with separate credentials. It uses Paga-specific SHA-512 request/callback hashing and IP allowlisting. Kintovo needs written marketplace approval, Sandbox approval/credentials, a fixed allowlisted egress IP, and a reviewed Paga-specific callback. Current code includes ordered SHA-512/hash verification and environment guards; it does not initiate payments or payouts. See [Money Transfer](https://developer-docs.paga.com/docs/money-transfer-payout), [Hash handling](https://developer-docs.paga.com/docs/handling-hash), and [Get started](https://developer-docs.paga.com/docs/get-started).
 - **Busha:** its official docs describe quote/recipient/transfer steps for payouts, including crypto-to-fiat flows, bearer-token authentication, and webhook/polling status checks. Review settlement assets, fees, destination verification, customer/provider KYC, supported countries, reversals, and custody/crypto implications before deciding whether it fits this product. See [Process payouts](https://docs.busha.co/guide/how-to-guides/process-payouts), [Recipients](https://docs.busha.co/guide/reference/recipients), and [API reference](https://docs.busha.co/reference).
 
 ## Known release blockers
 
 - Node.js build/test/lint and Prisma schema validation have not run on the source system.
-- No initial database migration is committed; generate and review it.
-- No live payment adapter or provider-specific webhook verifier exists. Paga and Busha remain evaluation candidates.
+- No Paga payment adapter or Paga webhook route exists; Sandbox endpoints have not been exercised.
 - Manual campaign attribution is a reviewable record, not provider-verified conversion tracking.
 - Private file storage, malware scanning, upload limits, and private delivery-file handling are not implemented.
 - Rate limiting, automated integration/E2E tests, accessibility audit, monitoring/alerting, and production email have not been completed.

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { rateLimitLogin } from "@/server/rate-limit";
 
-const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== "false";
+const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },

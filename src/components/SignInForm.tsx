@@ -13,7 +13,7 @@ export function SignInForm({ googleConfigured = false }: { googleConfigured?: bo
     setPending(true);
     try {
       const result = await signIn("credentials", { email: formData.get("email"), password: formData.get("password"), redirect: false, redirectTo: "/workspace" });
-      if (result?.error) setError("We couldn’t sign you in. Check your details and verify your email address.");
+      if (result?.error) setError("We couldn’t sign you in. Check your email and password, then try again.");
       else window.location.assign("/workspace");
     } catch {
       setError("Sign-in is temporarily unavailable. Try again in a moment.");

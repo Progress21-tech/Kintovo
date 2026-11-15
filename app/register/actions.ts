@@ -10,7 +10,7 @@ import { sendAccountEmail } from "@/server/email";
 import { consumeRateLimit, rateLimitKey } from "@/server/rate-limit";
 import { privacyVersion, termsVersion } from "@/server/policies";
 
-const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION !== "false";
+const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
 
 const accountSchema = z.object({
   name: z.string().trim().min(2).max(100),
