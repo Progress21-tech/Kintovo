@@ -13,9 +13,15 @@ export function SignInForm({ googleConfigured = false }: { googleConfigured?: bo
     setPending(true);
     try {
       const result = await signIn("credentials", { email: formData.get("email"), password: formData.get("password"), redirect: false, redirectTo: "/workspace" });
-      if (result?.error) setError("We couldn’t sign you in. Check your email and password, then try again.");
-      else window.location.assign("/workspace");
+      if (result?.error) {
+        console.warn("[Kintovo auth] browser credentials sign-in failed", { error: result.error, status: result.status, url: result.url });
+        setError("We couldn’t sign you in. Check your email and password, then try again.");
+      } else {
+        console.info("[Kintovo auth] browser credentials sign-in accepted");
+        window.location.assign("/workspace");
+      }
     } catch {
+      console.error("[Kintovo auth] browser credentials sign-in request failed");
       setError("Sign-in is temporarily unavailable. Try again in a moment.");
     } finally {
       setPending(false);

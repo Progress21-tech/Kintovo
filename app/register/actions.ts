@@ -12,6 +12,11 @@ import { privacyVersion, termsVersion } from "@/server/policies";
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
 
+function maskEmail(email: string) {
+  const [local = "", domain = ""] = email.split("@");
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 const accountSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: z.email().trim().toLowerCase(),
@@ -42,7 +47,10 @@ export async function registerAccount(_state: { error?: string; success?: string
     product: formData.get("product") ?? undefined,
     location: formData.get("location") ?? undefined,
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again." };
+  if (!parsed.success) {
+    console.warn("[Kintovo auth] signup rejected: invalid input", { issues: parsed.error.issues.map((issue) => issue.message) });
+    return { error: parsed.error.issues[0]?.message ?? "Check the details and try again." };
+  }
   const requestHeaders = await headers();
   const ip = (requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() || requestHeaders.get("x-real-ip") || "unknown").slice(0, 100);
   let allowed: boolean[];
@@ -55,9 +63,18 @@ export async function registerAccount(_state: { error?: string; success?: string
     console.error("Signup rate-limit check failed", error);
     return { error: "Signup is temporarily unavailable. Please try again later." };
   }
-  if (!allowed.every(Boolean)) return { error: "Too many account requests. Try again later." };
-  if (parsed.data.context === "BUSINESS" && !parsed.data.organisation) return { error: "Enter your organisation name." };
-  if (requireEmailVerification && process.env.NODE_ENV === "production" && (!process.env.SMTP_HOST || !process.env.EMAIL_FROM)) return { error: "Account verification email is not configured yet." };
+  if (!allowed.every(Boolean)) {
+    console.warn("[Kintovo auth] signup rejected: rate limited", { email: maskEmail(parsed.data.email) });
+    return { error: "Too many account requests. Try again later." };
+  }
+  if (parsed.data.context === "BUSINESS" && !parsed.data.organisation) {
+    console.warn("[Kintovo auth] signup rejected: organisation missing", { email: maskEmail(parsed.data.email) });
+    return { error: "Enter your organisation name." };
+  }
+  if (requireEmailVerification && process.env.NODE_ENV === "production" && (!process.env.SMTP_HOST || !process.env.EMAIL_FROM)) {
+    console.error("[Kintovo auth] signup rejected: verification email not configured", { email: maskEmail(parsed.data.email) });
+    return { error: "Account verification email is not configured yet." };
+  }
 
   const token = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -86,15 +103,19 @@ export async function registerAccount(_state: { error?: string; success?: string
       try {
         await sendAccountEmail(parsed.data.email, "Verify your Kintovo account", verifyUrl);
       } catch (error) {
-        console.error("Signup verification email delivery failed", error);
+        console.error("[Kintovo auth] signup verification email delivery failed", { email: maskEmail(parsed.data.email), error });
         return { error: "Your account was created, but we could not send the verification email. Please contact support." };
       }
     }
   } catch (error) {
-    if (error instanceof Error && error.message.includes("Unique constraint")) return { error: "An account with that email already exists." };
-    console.error("Signup account creation failed", error);
+    if (error instanceof Error && error.message.includes("Unique constraint")) {
+      console.warn("[Kintovo auth] signup rejected: email already exists", { email: maskEmail(parsed.data.email) });
+      return { error: "An account with that email already exists." };
+    }
+    console.error("[Kintovo auth] signup account creation failed", { email: maskEmail(parsed.data.email), error });
     return { error: "We could not create your account right now. Please try again later." };
   }
+  console.info("[Kintovo auth] signup accepted", { email: maskEmail(parsed.data.email), requireEmailVerification });
   return {
     success: requireEmailVerification
       ? "Account created. Use the verification link sent to your email before signing in."

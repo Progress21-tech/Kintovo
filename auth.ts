@@ -9,6 +9,11 @@ import { rateLimitLogin } from "@/server/rate-limit";
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
 
+function maskEmail(email: string) {
+  const [local = "", domain = ""] = email.split("@");
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
   pages: { signIn: "/sign-in", error: "/sign-in" },
@@ -20,12 +25,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const emailKey = String(credentials?.email ?? "").trim().toLowerCase().slice(0, 320) || "invalid";
         const forwarded = request.headers.get("x-forwarded-for");
         const ip = (forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown").slice(0, 100);
-        if (!await rateLimitLogin(emailKey, ip)) return null;
+        if (!await rateLimitLogin(emailKey, ip)) {
+          console.warn("[Kintovo auth] credentials denied: rate limited", { email: maskEmail(emailKey) });
+          return null;
+        }
         const parsed = z.object({ email: z.email().trim(), password: z.string().min(1) }).safeParse(credentials);
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          console.warn("[Kintovo auth] credentials denied: invalid input", { email: maskEmail(emailKey), issues: parsed.error.issues.map((issue) => issue.message) });
+          return null;
+        }
         const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-        if (!user || user.disabledAt || user.bannedAt || (requireEmailVerification && !user.emailVerifiedAt)) return null;
-        if (!(await bcrypt.compare(parsed.data.password, user.passwordHash))) return null;
+        if (!user) {
+          console.warn("[Kintovo auth] credentials denied: user not found", { email: maskEmail(emailKey), requireEmailVerification });
+          return null;
+        }
+        if (user.disabledAt || user.bannedAt) {
+          console.warn("[Kintovo auth] credentials denied: account unavailable", {
+            email: maskEmail(emailKey),
+            disabled: Boolean(user.disabledAt),
+            banned: Boolean(user.bannedAt),
+          });
+          return null;
+        }
+        if (requireEmailVerification && !user.emailVerifiedAt) {
+          console.warn("[Kintovo auth] credentials denied: email not verified", { email: maskEmail(emailKey) });
+          return null;
+        }
+        if (!(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
+          console.warn("[Kintovo auth] credentials denied: password mismatch", { email: maskEmail(emailKey) });
+          return null;
+        }
+        console.info("[Kintovo auth] credentials sign-in accepted", { email: maskEmail(emailKey) });
         return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole };
       },
     }),
@@ -38,12 +68,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;
       const email = user.email?.trim().toLowerCase();
-      if (!email) return "/sign-in?notice=google-email-missing";
+      if (!email) {
+        console.warn("[Kintovo auth] Google sign-in denied: email missing");
+        return "/sign-in?notice=google-email-missing";
+      }
       if (requireEmailVerification && profile && "email_verified" in profile && profile.email_verified === false) {
+        console.warn("[Kintovo auth] Google sign-in denied: email not verified", { email: maskEmail(email) });
         return "/sign-in?notice=google-email-unverified";
       }
       const existing = await db.user.findUnique({ where: { email } });
-      if (existing?.disabledAt || existing?.bannedAt) return "/sign-in?notice=account-unavailable";
+      if (existing?.disabledAt || existing?.bannedAt) {
+        console.warn("[Kintovo auth] Google sign-in denied: account unavailable", {
+          email: maskEmail(email),
+          disabled: Boolean(existing.disabledAt),
+          banned: Boolean(existing.bannedAt),
+        });
+        return "/sign-in?notice=account-unavailable";
+      }
       const persisted = existing ?? await db.user.create({
         data: {
           name: user.name?.trim() || email.split("@")[0],
@@ -58,6 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       user.id = persisted.id;
       user.name = persisted.name;
       user.email = persisted.email;
+      console.info("[Kintovo auth] Google sign-in accepted", { email: maskEmail(email), existing: Boolean(existing) });
       return true;
     },
     async jwt({ token, user }) {
