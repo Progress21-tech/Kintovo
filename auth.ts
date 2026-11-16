@@ -39,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider !== "google") return true;
       const email = user.email?.trim().toLowerCase();
       if (!email) return "/sign-in?notice=google-email-missing";
-      if (profile && "email_verified" in profile && profile.email_verified === false) {
+      if (requireEmailVerification && profile && "email_verified" in profile && profile.email_verified === false) {
         return "/sign-in?notice=google-email-unverified";
       }
       const existing = await db.user.findUnique({ where: { email } });

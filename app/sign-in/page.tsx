@@ -9,7 +9,7 @@ const notices: Record<string, string> = {
   "password-updated": "Your password has been updated. Sign in with the new password.",
   "account-unavailable": "This account is unavailable. Contact platform support.",
   "google-email-missing": "Google did not provide an email address for this account. Check your Google account permissions and try again.",
-  "google-email-unverified": "Google could not verify this email address. Use a verified Google account or sign in with your Kintovo password.",
+  "google-email-unverified": "Google could not verify this email address. Enable email verification or use a verified Google account.",
   "sign-in-denied": "Sign-in was denied. Check your account status or try another sign-in method.",
 };
 
