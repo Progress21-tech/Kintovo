@@ -287,7 +287,7 @@ export async function createPagaUsdCollection(input: {
     payee: { name: requiredText(input.payeeName, "payeeName") },
     expiryDateTimeUTC,
     payerCollectionFeeShare: 1,
-    payeeCollectionFeeShare: 0,
+    recipientCollectionFeeShare: 0,
     isAllowPartialPayments: false,
     isAllowOverPayments: true,
     callBackUrl: requiredText(input.callbackUrl, "callbackUrl"),
