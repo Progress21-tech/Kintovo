@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
+import { PagaAccountProvisionForm } from "./PagaAccountProvisionForm";
+import { UsdFundingForm } from "./UsdFundingForm";
 
 function formatNgn(minor: bigint | null) {
   if (minor === null) return "Not synced";
@@ -17,6 +19,12 @@ export default async function FundingPage() {
   if (!membership) redirect("/workspace");
   const account = membership.organisation.pagaAccount;
   const sandboxEnabled = process.env.PAGA_ENABLE_SANDBOX === "true";
+  const usdCollections = account ? await db.pagaUsdCollection.findMany({
+    where: { accountId: account.id },
+    select: { referenceNumber: true, requestedNgnMinor: true, status: true, responseData: true, failureReason: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  }) : [];
 
   return <main className="app-main">
     <PageHeader
@@ -45,6 +53,7 @@ export default async function FundingPage() {
             <li><div><strong>Public account callback</strong><small>HTTPS endpoint at /api/webhooks/paga/accounts</small></div><span>{process.env.PAGA_ACCOUNT_CALLBACK_URL ? "Configured" : "Pending"}</span></li>
             <li><div><strong>Account ledger</strong><small>Funding transactions are matched by Paga account number</small></div><span>Ready after migration</span></li>
           </ul>
+          <PagaAccountProvisionForm />
         </>}
       </div>
     </section>
@@ -52,5 +61,27 @@ export default async function FundingPage() {
       <div className="panel-header"><div><h2>Currency and settlement</h2><span className="field-note">This account is a real NGN subsidiary account, not a multi-currency wallet.</span></div></div>
       <div className="panel-content"><p>USD collection uses Paga's separate USD bank-transfer payment request flow and settles as NGN at Paga's exchange rate when the payment arrives. EUR and GBP collection are not enabled through this Paga integration. They must stay unavailable until a separate, approved provider flow is selected.</p></div>
     </section>
+    <section className="panel earnings-withdrawal">
+      <div className="panel-header"><div><h2>Fund from a USD bank account</h2><span className="field-note">Paga creates single-use ACH, US wire, and SWIFT instructions. Each rail has its own USD amount and fee.</span></div><span className="status-pill">USD to NGN</span></div>
+      <div className="panel-content">
+        {account?.status === "ACTIVE" ? <UsdFundingForm /> : <p className="field-note">The organisation's Paga account must be active before USD funding requests can be created.</p>}
+        <p className="legal-note">Paga's USD callback does not document a signature header. Kintovo verifies the payment reference through Paga's authenticated status API and credits only the NGN amount requested when the instruction was created. FX and overpayment differences require reconciliation.</p>
+      </div>
+    </section>
+    {usdCollections.length > 0 && <section className="earnings-list"><h2 className="section-subhead">Recent USD funding requests</h2>{usdCollections.map((item) => {
+      const response = item.responseData && typeof item.responseData === "object" && !Array.isArray(item.responseData) ? item.responseData as Record<string, unknown> : {};
+      const responseData = response.data && typeof response.data === "object" && !Array.isArray(response.data) ? response.data as Record<string, unknown> : response;
+      const methods = Array.isArray(responseData.paymentMethods) ? responseData.paymentMethods : [];
+      return <article className="panel earnings-row" key={item.referenceNumber}>
+        <div><strong>NGN {(Number(item.requestedNgnMinor) / 100).toLocaleString("en-NG")}</strong><small>{item.referenceNumber} · {item.createdAt.toLocaleString("en-NG")}</small>{item.failureReason && <small>{item.failureReason}</small>}</div>
+        <span className={`status-pill ${item.status === "COMPLETED" ? "green" : item.status === "FAILED" || item.status === "FUNDING_FAILED" ? "amber" : "blue"}`}>{item.status.replaceAll("_", " ")}</span>
+        {methods.map((method, index) => {
+          const rail = method && typeof method === "object" && !Array.isArray(method) ? method as Record<string, unknown> : {};
+          const properties = rail.properties && typeof rail.properties === "object" && !Array.isArray(rail.properties) ? rail.properties as Record<string, unknown> : {};
+          const details = Object.entries(properties);
+          return <div className="panel-content" key={`${item.referenceNumber}-${index}`}><h3>{typeof rail.name === "string" ? rail.name : `Payment method ${index + 1}`}</h3>{typeof rail.bankName === "string" && <p><strong>Bank:</strong> {rail.bankName}</p>}{details.length > 0 && <dl className="review-history">{details.map(([label, value]) => <div key={label}><dt>{label.replaceAll(/([A-Z])/g, " $1")}</dt><dd>{typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : JSON.stringify(value)}</dd></div>)}</dl>}</div>;
+        })}
+      </article>;
+    })}</section>}
   </main>;
 }

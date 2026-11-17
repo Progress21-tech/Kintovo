@@ -84,12 +84,13 @@ async function pagaRequest<T extends PagaJson>(input: {
   method: "GET" | "POST" | "PUT";
   headers: Record<string, string>;
   body?: PagaJson;
+  timeoutMs?: number;
 }) {
   const response = await fetch(input.url, {
     method: input.method,
     headers: input.headers,
     body: input.body ? JSON.stringify(input.body) : undefined,
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(input.timeoutMs ?? 15_000),
     cache: "no-store",
   });
   const text = await response.text();
@@ -190,9 +191,11 @@ export async function topUpPagaSubsidiaryAccount(input: { accountReference: stri
   const config = getPagaConfiguration();
   const account = requiredText(input.accountReference, "accountReference");
   const reference = requiredText(input.referenceNumber, "referenceNumber");
-  const amount = requiredText(input.amountNgn, "amountNgn");
+  const amount = Number(requiredText(input.amountNgn, "amountNgn"));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("amountNgn must be a positive number.");
+  const amountHashValue = String(amount);
   const narration = input.narration ?? "";
-  const hash = pagaSha512([reference, amount, "NGN", narration], config.hashKey);
+  const hash = pagaSha512([reference, amountHashValue, "NGN", narration], config.hashKey);
   return pagaRequest<PagaJson>({
     url: `${config.collectBaseUrl}/subsidiary-accounts/${encodeURIComponent(account)}/top-up`,
     method: "POST",
@@ -206,9 +209,11 @@ export async function chargePagaSubsidiaryAccount(input: { accountReference: str
   const config = getPagaConfiguration();
   const account = requiredText(input.accountReference, "accountReference");
   const reference = requiredText(input.referenceNumber, "referenceNumber");
-  const amount = requiredText(input.amountNgn, "amountNgn");
+  const amount = Number(requiredText(input.amountNgn, "amountNgn"));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("amountNgn must be a positive number.");
+  const amountHashValue = String(amount);
   const narration = input.narration ?? "";
-  const hash = pagaSha512([reference, amount, "NGN", narration], config.hashKey);
+  const hash = pagaSha512([reference, amountHashValue, "NGN", narration], config.hashKey);
   return pagaRequest<PagaJson>({
     url: `${config.collectBaseUrl}/subsidiary-accounts/${encodeURIComponent(account)}/charge`,
     method: "POST",
@@ -269,19 +274,22 @@ export async function createPagaUsdCollection(input: {
 }) {
   const config = getPagaConfiguration();
   const reference = requiredText(input.referenceNumber, "referenceNumber");
-  const amount = requiredText(input.amountNgn, "amountNgn");
+  const amount = Number(requiredText(input.amountNgn, "amountNgn"));
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error("amountNgn must be a positive whole-naira amount.");
   const phone = requiredText(input.payerPhoneNumber, "payerPhoneNumber");
   const email = input.payerEmail ?? "";
+  const expiryDateTimeUTC = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
   const body = {
     referenceNumber: reference,
     amount,
     currency: "NGN",
     payer: { name: requiredText(input.payerName, "payerName"), phoneNumber: phone, currency: "USD", ...(email ? { email } : {}) },
     payee: { name: requiredText(input.payeeName, "payeeName") },
-    payerCollectionFeeShare: "1.0",
-    recipientCollectionFeeShare: "0.0",
-    isAllowPartialPayments: "false",
-    isAllowOverPayments: "true",
+    expiryDateTimeUTC,
+    payerCollectionFeeShare: 1,
+    payeeCollectionFeeShare: 0,
+    isAllowPartialPayments: false,
+    isAllowOverPayments: true,
     callBackUrl: requiredText(input.callbackUrl, "callbackUrl"),
     paymentMethods: ["BANK_TRANSFER"],
   };
@@ -290,6 +298,19 @@ export async function createPagaUsdCollection(input: {
     method: "POST",
     headers: collectBasic(config, [reference, amount, "NGN", phone, email]),
     body,
+  });
+}
+
+/** Verify an unsigned USD collection webhook against Paga's authenticated status API. */
+export async function getPagaUsdCollectionStatus(referenceNumber: string) {
+  const config = getPagaConfiguration();
+  const reference = requiredText(referenceNumber, "referenceNumber");
+  return pagaRequest<PagaJson>({
+    url: `${config.usdCollectBaseUrl}/status`,
+    method: "POST",
+    headers: collectBasic(config, [reference, "USD"]),
+    body: { referenceNumber: reference, paymentCurrency: "USD" },
+    timeoutMs: 3_500,
   });
 }
 

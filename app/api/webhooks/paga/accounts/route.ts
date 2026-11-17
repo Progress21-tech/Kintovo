@@ -17,6 +17,70 @@ function amountToMinor(amount: unknown) {
   return BigInt(minor);
 }
 
+function formattedAmountToMinor(amount: unknown) {
+  if (typeof amount !== "string" || !/^\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?$|^\d+(?:\.\d{1,2})?$/.test(amount)) return null;
+  const value = Number(amount.replaceAll(",", ""));
+  return amountToMinor(value);
+}
+
+async function handleOperationNotification(body: Record<string, unknown>) {
+  const event = body.event;
+  const expectedType = event === "SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE" ? "CREDIT" : "DEBIT";
+  if (![
+    "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE",
+    "SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE",
+    "SUBSIDIARY_ACCOUNT_TRANSFER_COMPLETE",
+  ].includes(String(event))) return NextResponse.json({ status: "INVALID" }, { status: 400 });
+  if (body.statusCode !== "0" || body.transactionType !== expectedType || typeof body.notificationId !== "string" || typeof body.externalReferenceNumber !== "string" || typeof body.transactionDate !== "string" || typeof body.accountNumber !== "string" || typeof body.accountReference !== "string" || typeof body.hash !== "string") {
+    return NextResponse.json({ status: "INVALID" }, { status: 400 });
+  }
+  let config;
+  try { config = getPagaConfiguration(); }
+  catch { return NextResponse.json({ status: "UNAVAILABLE" }, { status: 503 }); }
+  if (typeof body.amount !== "string" || !verifyPagaSha512([body.externalReferenceNumber, body.transactionDate, body.amount, body.accountNumber], config.hashKey, body.hash)) {
+    return NextResponse.json({ status: "INVALID" }, { status: 401 });
+  }
+  const amountMinor = formattedAmountToMinor(body.amount);
+  if (!amountMinor) return NextResponse.json({ status: "INVALID" }, { status: 400 });
+  const account = await db.pagaAccount.findFirst({ where: { accountReference: body.accountReference, accountNumber: body.accountNumber }, select: { id: true, status: true } });
+  if (!account || account.status !== "ACTIVE") return NextResponse.json({ status: "UNKNOWN_ACCOUNT" }, { status: 404 });
+
+  try {
+    await db.$transaction(async (tx) => {
+      const usdCollection = event === "SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE"
+        ? await tx.pagaUsdCollection.findUnique({ where: { topUpReference: body.externalReferenceNumber as string }, select: { id: true, status: true } })
+        : null;
+      await tx.pagaAccountLedgerEntry.create({
+        data: {
+          accountId: account.id,
+          reference: body.externalReferenceNumber as string,
+          direction: expectedType,
+          kind: usdCollection ? "USD_COLLECTION_CREDIT" : event === "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE" ? "WITHDRAWAL_DEBIT" : "ADJUSTMENT",
+          amountMinor,
+          currency: "NGN",
+          providerTransactionId: body.externalReferenceNumber as string,
+          providerEventId: body.notificationId as string,
+          metadata: JSON.parse(JSON.stringify({ event, fee: body.fee ?? null, transactionDate: body.transactionDate })),
+        },
+      });
+      await tx.pagaAccount.update({
+        where: { id: account.id },
+        data: {
+          ...(expectedType === "CREDIT" ? { lastBalanceMinor: { increment: amountMinor } } : { lastBalanceMinor: { decrement: amountMinor } }),
+          lastBalanceSyncedAt: new Date(),
+        },
+      });
+      if (usdCollection) await tx.pagaUsdCollection.update({ where: { id: usdCollection.id }, data: { status: "COMPLETED", failureReason: null } });
+    });
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "P2002")) {
+      console.error("Paga subsidiary operation callback could not be recorded", { accountId: account.id });
+      return NextResponse.json({ status: "RETRY" }, { status: 500 });
+    }
+  }
+  return NextResponse.json({ status: "SUCCESS" });
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text();
   if (rawBody.length > 32_000) return NextResponse.json({ status: "INVALID" }, { status: 413 });
@@ -29,6 +93,8 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ status: "INVALID" }, { status: 400 });
   }
+
+  if (typeof body.event === "string") return handleOperationNotification(body);
 
   const suppliedHash = request.headers.get("x-paga-hash-v3") ?? "";
   const parameterHeader = request.headers.get("x-paga-hash-v3-parameters") ?? "";
@@ -75,7 +141,7 @@ export async function POST(request: Request) {
           currency: "NGN",
           providerTransactionId: body.fundingTransactionReference as string,
           providerEventId: typeof transactionReference === "string" ? transactionReference : null,
-          metadata: { fundingPaymentReference: body.fundingPaymentReference ?? null, payerDetails: body.payerDetails ?? null, narration: body.narration ?? null },
+          metadata: JSON.parse(JSON.stringify({ fundingPaymentReference: body.fundingPaymentReference ?? null, payerDetails: body.payerDetails ?? null, narration: body.narration ?? null })),
         },
       });
       await tx.pagaAccount.update({ where: { id: account.id }, data: { lastBalanceMinor: { increment: amountMinor }, lastBalanceSyncedAt: new Date() } });

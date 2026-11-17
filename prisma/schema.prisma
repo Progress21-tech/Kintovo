@@ -158,6 +158,14 @@ enum PagaLedgerKind {
   REVERSAL
   ADJUSTMENT
 }
+enum PagaUsdCollectionStatus {
+  REQUESTED
+  CAPTURED
+  FUNDING_FAILED
+  TOP_UP_PENDING
+  COMPLETED
+  FAILED
+}
 enum SpecialistLevel {
   LEVEL_1
   LEVEL_2
@@ -927,6 +935,29 @@ model PagaAccount {
   organisation             Organisation?     @relation("PagaOrganisationAccount", fields: [organisationId], references: [id], onDelete: Cascade)
   entries                  PagaAccountLedgerEntry[]
   payouts                  PagaPayout[]
+  usdCollections           PagaUsdCollection[]
+  @@index([status, createdAt])
+}
+
+model PagaUsdCollection {
+  id                    String                   @id @default(cuid())
+  accountId             String
+  referenceNumber       String                   @unique
+  topUpReference        String                   @unique
+  requestedNgnMinor     BigInt
+  status                PagaUsdCollectionStatus  @default(REQUESTED)
+  paymentId             String?                  @unique
+  sourceAmountUsd       String?
+  creditedAmountMinor   BigInt?
+  reportedNgnMinor      BigInt?
+  foreignExchangeRate   String?
+  responseData          Json?
+  webhookData           Json?
+  failureReason         String?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  account               PagaAccount              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@index([accountId, createdAt])
   @@index([status, createdAt])
 }
 

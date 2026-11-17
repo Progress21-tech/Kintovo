@@ -12,18 +12,18 @@ Kintovo is a Next.js 16 App Router application using React 19, TypeScript, Auth.
 | Compensation | `CompensationObligation` is the payable ledger source for milestones, campaign fixed fees, and bonuses. New obligations are `MOCK` and simulated. | This model represents professional compensation. It is not a buyer funding balance or a Paga subsidiary account. |
 | Finance operations | Finance/Admin roles can record simulated settlement, failure, refund, adjustment, and reconciliation events. | No Paga transfer execution or recipient bank details are implemented. Approved withdrawal requests do not send money. |
 | Payment display | `/workspace/payments` lists obligations and ledger entries with explicit simulated/provider status labels. | No Checkout/payment request initiation UI exists. |
-| Funding | `/workspace/funding` is an informational placeholder, and currently still mentions Paystack. | It must be replaced before claiming any provider funding flow. |
+| Funding | `/workspace/funding` provisions a Paga subsidiary account and creates USD bank-transfer instructions for the organisation. | Sandbox-only; provider product entitlements, callback setup, and end-to-end validation still gate use. |
 | Webhooks | `/api/webhooks/payments` accepts a generic SHA-256 HMAC event shape when `PAYMENT_MODE=provider`. It is not a Paga webhook and must not be used for Paga. | Paga uses endpoint-specific SHA-512 concatenation hashes and distinct callback payloads. |
 | Access | `requireUser`, organisation membership, spend authority, and finance/admin role checks are server-side. | Paga-facing actions must reuse these checks and must not trust client status or identifiers alone. |
-| Database | Compensation, append-only ledger entries, webhook receipt IDs, audit logs, migrations already exist. | A distinct buyer-side collection obligation and payout destination model are needed before money flows can map safely. |
+| Database | Compensation remains separate from new Paga subsidiary accounts, NGN ledger entries, USD collection records, bank destination, and payout foundation records. | The new models need Prisma validation and Codespaces DB migration before they can run. Bank destination and payout workflow are not yet connected. |
 
 The repository contains `docs/brand.md` and a previous product discovery report, but the pitch deck and design-system PDFs referenced by the broader `implementation.md` are not present in this workspace. The current Paga task can use the prior discovery report for context; PDF-specific claims cannot be revalidated here.
 
 ## Architecture and workflow map
 
-The existing provider seam is `src/server/payments.ts`, presently a local simulation helper and generic webhook verifier. The new `src/server/paga.ts` is only a small cryptographic/configuration boundary: it implements ordered SHA-512 concatenation, timing-safe Checkout callback hash comparison, distinct Collect Basic and Business `principal`/`credentials` header builders, environment host selection, and disabled-by-default Sandbox credentials. It does not yet issue Paga requests or mutate the ledger.
+The existing provider seam is `src/server/payments.ts`, presently a local simulation helper and generic webhook verifier. The Paga adapter is separate in `src/server/paga.ts`: it implements the documented Collect Basic and Business `principal`/`credentials` auth styles, SHA-512 request hashes, Sandbox API calls, account operations, USD collection, and account callbacks. Paga remains disabled by default and Live is rejected in code.
 
-Current financial workflow: accepted agreement → milestone → submission/review → compensation obligation → simulated finance action → append-only ledger entry. Paga collections would be a separate buyer obligation; provider-confirmed collection cannot itself authorize custody or conditional release. Payout flow would be: reviewed withdrawal/compensation amount → verified recipient/bank destination → bank/account validation → finance-authorized payout → provider callback/status verification → ledger settlement. That payout path is not implemented because destination records and account approval are absent.
+Current professional compensation remains on the existing simulated ledger and is not funded by Paga or withdrawable through Paga. Separate Paga subsidiary-account funding is implemented for organisation and personal accounts. USD collection is a distinct request flow, not a multi-currency account. Recipient-bank onboarding and Finance-approved bank payout are not implemented; the payout schema/API helpers alone do not make payouts available.
 
 ## Official API register and Kintovo classification
 
@@ -112,17 +112,20 @@ The current v1.5 grouped Business API guide also identifies `getBanks`, `validat
 - The older Collect API operation collection lists separate payment-request status/refund/history/bank-list operations and a Persistent Payment Identifier lifecycle, while the newer grouped guide uses Dynamic Virtual Account and Subsidiary Account terminology. Do not mix their request shapes or account concepts without Paga confirmation.
 - Current docs say Sandbox accounts require approval; Sandbox uses simulated funds and separate keys. No Paga keys or account approval were found in repository configuration. Live keys are unavailable and Live code paths intentionally throw.
 
-## Implemented in this change
+## Current implementation status (17 November 2026)
 
-- `src/server/paga.ts`: ordered SHA-512 helper, constant-time Checkout callback hash check, distinct Collect/Business API auth header builders, correct separated Sandbox Collect and Business API base URLs, configuration validation, disabled-by-default Sandbox, and unconditional Live guard.
-- `.env.example`: placeholders only; Sandbox disabled, no Live secrets.
-- `src/server/paga.test.ts`: hash ordering, omitted-field handling, callback hash comparison, and environment/Live safeguards. Added to the test script.
-
-No payment or payout endpoint is claimed as implemented or tested against Paga. This is a guide-level API register, not yet the requested field-by-field endpoint workbook: for each candidate operation, exact request schema, all response/status/error codes, test vectors, and callback edge cases still need validation against the current OpenAPI/Postman artifacts and Paga account. Actual API calls remain blocked because there is no approved Sandbox account/credential, account product permissions, fixed allowlisted egress IP, or callback URL. The generic SHA-256 `/api/webhooks/payments` handler must not be used for Paga.
+- `POST https://beta-collect.paga.com/subsidiary-accounts` provisions ledger-backed NGN accounts for business organisations and personal creator/specialist users. Account creation runs after signup or from the business funding page. The merchant remains the legal owner under Paga's account guide; this is not escrow.
+- `/api/webhooks/paga/accounts` verifies the signed subsidiary funding notification and signed account-operation callback, then records idempotent NGN ledger entries.
+- USD collection uses `POST https://qa1-collect.paga.com/paymentRequest`; status verification uses `POST https://qa1-collect.paga.com/status` with `paymentCurrency=USD`. The USD webhook has no documented signature header, so Kintovo confirms the reference through Paga's authenticated status API. A confirmed payment triggers an NGN subsidiary-account top-up with a stable reference. Only the originally requested NGN amount is credited; FX/overpayment differences require finance reconciliation.
+- Paga subsidiary accounts support NGN only. EUR and GBP are unavailable. USD converts to NGN; this is not a USD wallet.
+- The user reports a verified Sandbox account. Sandbox credentials are not in the repository, and exact product entitlements, public callback URLs, and actual Sandbox requests still need confirmation. Sandbox activity uses test funds. Live requests remain disabled.
+- Business `getBanks`, bank validation, and `depositToBank` helpers and payout records are scaffolding only. There is no bank-linking UI or Finance/Admin-approved real payout execution yet. `WithdrawalRequest.APPROVED` does not transfer money.
+- Compensation obligations and Finance simulation actions remain `MOCK`/simulated, separate from the Paga account ledger. They do not fund creator/specialist withdrawals.
+- No provider request has been run or validated against Paga. Run Prisma generation and TypeScript checks in Codespaces before applying the migration. The generic SHA-256 `/api/webhooks/payments` handler remains separate and must not be used for Paga.
 
 ## Provider questions and production gates
 
-Obtain written Paga confirmation for: collecting business payments for third-party engagements; payouts to independent professionals/creators; subsidiary-account use; whether any balance may be held pending work approval; milestone and partial settlement; disputed funds; refunds; team payouts; cross-border collection; and the exact products enabled for Kintovo. Also obtain Sandbox approval/keys, production egress IP allowlisting, callback URL setup, rate/limit/error guidance, and Live approval. Keep `PAYMENT_MODE=simulated` and `PAGA_ENABLE_SANDBOX=false` until the Sandbox tests and account-specific scope are completed. Live remains disabled in code.
+Before enabling more flows, obtain written Paga confirmation for collecting business payments for third-party engagements; paying independent professionals/creators; subsidiary-account use; holding balances pending work; milestone/partial settlement; disputes/refunds; and exact product entitlements for Kintovo. Configure Sandbox credentials and public HTTPS callbacks as Codespaces/deployment secrets; keep `PAGA_ENABLE_SANDBOX=false` until schema/type checks and Sandbox request/callback verification pass. The legacy compensation flow remains simulated. Live stays disabled in code.
 
 ## Official documentation reviewed
 
@@ -136,6 +139,12 @@ Obtain written Paga confirmation for: collecting business payments for third-par
 - [USD collection](https://developer-docs.paga.com/docs/paga-dynamic-payment-identifier-usd-collection)
 - [Refunds](https://developer-docs.paga.com/docs/refunds)
 - [Subsidiary accounts](https://developer-docs.paga.com/docs/subsidiary-accounts)
+- [Create a subsidiary account](https://developer-docs.paga.com/reference/subsidiary-accounts-createsubsidiaryaccount)
+- [Handle subsidiary funding notifications](https://developer-docs.paga.com/reference/subsidiary-accounts-subsidiaryfunding)
+- [Handle charge/top-up/transfer notifications](https://developer-docs.paga.com/reference/subsidiary-accounts-subsidiaryoperation)
+- [Create USD bank-transfer payment request](https://developer-docs.paga.com/reference/usd-bank-transfer-createpaymentrequest)
+- [Handle USD collection webhook](https://developer-docs.paga.com/reference/usd-bank-transfer-usdpaymentwebhook)
+- [Verify USD collection status](https://developer-docs.paga.com/reference/usd-bank-transfer-getusdpaymentstatus)
 - [Business account operations](https://developer-docs.paga.com/docs/your-business-account)
 - [Money Transfer](https://developer-docs.paga.com/docs/money-transfer-payout)
 - [Airtime and data](https://developer-docs.paga.com/docs/airtime-and-data-purchase)
