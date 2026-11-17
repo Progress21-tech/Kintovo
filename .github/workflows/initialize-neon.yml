@@ -67,4 +67,28 @@ jobs:
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Apply migration to Neon
-        run: npx prisma migrate deploy
+        run: |
+          set +e
+          deploy_output="$(npx prisma migrate deploy 2>&1)"
+          deploy_exit_code=$?
+          set -e
+          echo "$deploy_output"
+
+          if [ "$deploy_exit_code" -eq 0 ]; then
+            exit 0
+          fi
+
+          if echo "$deploy_output" | grep -q "Error: P3005"; then
+            initial_migration="$(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | head -n 1)"
+            if [ -z "$initial_migration" ]; then
+              echo "No migration directory was found for baseline resolution."
+              exit "$deploy_exit_code"
+            fi
+
+            echo "Detected a non-empty database without Prisma migration history. Marking $initial_migration as applied."
+            npx prisma migrate resolve --applied "$initial_migration"
+            npx prisma migrate deploy
+            exit 0
+          fi
+
+          exit "$deploy_exit_code"
