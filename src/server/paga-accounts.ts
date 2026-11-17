@@ -43,7 +43,7 @@ async function provision(owner: AccountOwner, contact: { name: string; email: st
   const callbackUrl = process.env.PAGA_ACCOUNT_CALLBACK_URL?.trim();
   let callbackIsHttps = false;
   try { callbackIsHttps = new URL(callbackUrl ?? "").protocol === "https:"; } catch { /* invalid URL */ }
-  if (!callbackIsHttps) {
+  if (!callbackUrl || !callbackIsHttps) {
     return db.pagaAccount.update({ where: { id: account.id }, data: { provisioningError: "PAGA_ACCOUNT_CALLBACK_URL must be configured as a public HTTPS URL." } });
   }
 

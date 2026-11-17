@@ -37,7 +37,7 @@ export async function createUsdFundingRequest(_state: { error?: string; success?
         accountId: account.id,
         referenceNumber,
         topUpReference,
-        requestedNgnMinor: BigInt(parsed.data.amountNgn) * 100n,
+        requestedNgnMinor: BigInt(parsed.data.amountNgn) * BigInt(100),
         status: "REQUESTED",
       },
     });
