@@ -136,7 +136,27 @@ enum WithdrawalStatus {
   PENDING_REVIEW
   APPROVED
   REJECTED
+  PROCESSING
+  PAYOUT_FAILED
   PAID
+}
+enum PagaAccountStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  DISABLED
+}
+enum PagaLedgerDirection {
+  CREDIT
+  DEBIT
+}
+enum PagaLedgerKind {
+  PROVIDER_FUNDING
+  USD_COLLECTION_CREDIT
+  EARNINGS_CREDIT
+  WITHDRAWAL_DEBIT
+  REVERSAL
+  ADJUSTMENT
 }
 enum SpecialistLevel {
   LEVEL_1
@@ -235,6 +255,8 @@ model User {
   campaignRatingsReceived CampaignRating[] @relation("CampaignRatingRecipient")
   withdrawals     WithdrawalRequest[] @relation("WithdrawalOwner")
   withdrawalsReviewed WithdrawalRequest[] @relation("WithdrawalReviewer")
+  pagaAccount     PagaAccount? @relation("PagaUserAccount")
+  pagaBankDestinations PagaBankDestination[]
   @@index([lastActiveAt, disabledAt, bannedAt])
 }
 
@@ -252,6 +274,7 @@ model Organisation {
   projects    Project[]
   invitations OrganisationInvitation[]
   campaigns   Campaign[]
+  pagaAccount PagaAccount? @relation("PagaOrganisationAccount")
 }
 
 model OrganisationInvitation {
@@ -881,8 +904,90 @@ model WithdrawalRequest {
   reviewNote  String?
   user        User            @relation("WithdrawalOwner", fields: [userId], references: [id], onDelete: Cascade)
   reviewer    User?           @relation("WithdrawalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  pagaPayout  PagaPayout?
   @@index([status, reviewAfter])
   @@index([userId, status, requestedAt])
+}
+
+model PagaAccount {
+  id                       String            @id @default(cuid())
+  userId                   String?           @unique
+  organisationId           String?           @unique
+  accountReference         String            @unique
+  provisioningReference     String            @unique
+  accountNumber            String?           @unique
+  currency                 String            @default("NGN")
+  status                   PagaAccountStatus @default(PENDING)
+  provisioningError        String?
+  lastBalanceMinor         BigInt?
+  lastBalanceSyncedAt      DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  user                     User?             @relation("PagaUserAccount", fields: [userId], references: [id], onDelete: Cascade)
+  organisation             Organisation?     @relation("PagaOrganisationAccount", fields: [organisationId], references: [id], onDelete: Cascade)
+  entries                  PagaAccountLedgerEntry[]
+  payouts                  PagaPayout[]
+  @@index([status, createdAt])
+}
+
+model PagaAccountLedgerEntry {
+  id                    String              @id @default(cuid())
+  accountId             String
+  reference             String
+  direction             PagaLedgerDirection
+  kind                  PagaLedgerKind
+  amountMinor           BigInt
+  currency              String              @default("NGN")
+  providerTransactionId String?             @unique
+  providerEventId       String?             @unique
+  sourceCurrency        String?
+  sourceAmount          String?
+  foreignExchangeRate   String?
+  metadata              Json?
+  createdAt             DateTime            @default(now())
+  account               PagaAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  @@unique([accountId, reference])
+  @@index([accountId, createdAt])
+}
+
+model PagaBankDestination {
+  id                    String   @id @default(cuid())
+  userId                String
+  bankPublicId          String
+  bankName              String
+  accountNumberCipher   String
+  accountNumberLast4    String
+  accountHolderName     String
+  validatedAt           DateTime
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payouts               PagaPayout[]
+  @@index([userId, isDefault])
+}
+
+model PagaPayout {
+  id                    String   @id @default(cuid())
+  withdrawalRequestId   String   @unique
+  accountId             String
+  bankDestinationId     String
+  currency              String   @default("NGN")
+  amountMinor           BigInt
+  chargeReference       String   @unique
+  payoutReference       String   @unique
+  chargeTransactionId   String?
+  payoutTransactionId   String?
+  chargeCompletedAt     DateTime?
+  payoutCompletedAt     DateTime?
+  failureReason         String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  withdrawalRequest     WithdrawalRequest @relation(fields: [withdrawalRequestId], references: [id], onDelete: Cascade)
+  account               PagaAccount @relation(fields: [accountId], references: [id])
+  bankDestination       PagaBankDestination @relation(fields: [bankDestinationId], references: [id])
+  @@index([createdAt])
+  @@index([chargeCompletedAt, payoutCompletedAt])
 }
 
 model LedgerEntry {

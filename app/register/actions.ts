@@ -9,6 +9,7 @@ import { db } from "@/server/db";
 import { sendAccountEmail } from "@/server/email";
 import { consumeRateLimit, rateLimitKey } from "@/server/rate-limit";
 import { privacyVersion, termsVersion } from "@/server/policies";
+import { ensurePagaOrganisationAccount, ensurePagaUserAccount } from "@/server/paga-accounts";
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
 
@@ -80,15 +81,19 @@ export async function registerAccount(_state: { error?: string; success?: string
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   const acceptedAt = new Date();
+  let createdUserId: string | null = null;
+  let createdOrganisationId: string | null = null;
   try {
     await db.$transaction(async (tx) => {
       const user = await tx.user.create({ data: { name: parsed.data.name, email: parsed.data.email, passwordHash, termsAcceptedAt: acceptedAt, termsVersion, privacyAcceptedAt: acceptedAt, privacyVersion } });
+      createdUserId = user.id;
       if (parsed.data.context === "BUSINESS") {
         const organisation = await tx.organisation.create({ data: {
           name: parsed.data.organisation!, website: parsed.data.website || null,
           industry: parsed.data.industry || null, model: parsed.data.model || null,
           product: parsed.data.product || null, location: parsed.data.location || null,
         } });
+        createdOrganisationId = organisation.id;
         await tx.organisationMembership.create({ data: { organisationId: organisation.id, userId: user.id, role: "OWNER" } });
       } else if (parsed.data.context === "SPECIALIST") {
         await tx.professionalProfile.create({ data: { userId: user.id, categories: [], skills: [], languages: ["English"] } });
@@ -114,6 +119,15 @@ export async function registerAccount(_state: { error?: string; success?: string
     }
     console.error("[Kintovo auth] signup account creation failed", { email: maskEmail(parsed.data.email), error });
     return { error: "We could not create your account right now. Please try again later." };
+  }
+  // Provision the user's real Paga Sandbox account after the account transaction
+  // commits. Registration remains available if Paga is temporarily unreachable;
+  // the pending account can be retried from the finance workflow.
+  try {
+    if (createdOrganisationId) await ensurePagaOrganisationAccount(createdOrganisationId);
+    else if (createdUserId) await ensurePagaUserAccount(createdUserId);
+  } catch (error) {
+    console.error("Paga Sandbox account provisioning did not complete", { accountContext: parsed.data.context, error });
   }
   console.info("[Kintovo auth] signup accepted", { email: maskEmail(parsed.data.email), requireEmailVerification });
   return {

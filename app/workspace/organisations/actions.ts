@@ -8,6 +8,7 @@ import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canAssignOrganisationRole, canInviteOrganisationMembers } from "@/server/permissions";
 import { sendAccountEmail } from "@/server/email";
+import { ensurePagaOrganisationAccount } from "@/server/paga-accounts";
 
 const organisationSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -40,6 +41,11 @@ export async function createOrganisation(_state: { error?: string; success?: str
     await tx.auditLog.create({ data: { actorId: user.id, action: "ORGANISATION_CREATED", entityType: "Organisation", entityId: created.id } });
     return created;
   });
+  try {
+    await ensurePagaOrganisationAccount(organisation.id);
+  } catch (error) {
+    console.error("Paga Sandbox organisation account provisioning did not complete", { organisationId: organisation.id, error });
+  }
   revalidatePath("/workspace");
   redirect(`/workspace/organisations?created=${organisation.id}`);
 }
