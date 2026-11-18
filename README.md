@@ -37,7 +37,6 @@ The problem it addresses is fragmentation. Businesses often use separate tools f
 - Google Gemini-compatible AI planning API
 - Docker and Docker Compose
 - Paga Engine Sandbox foundations
-- Busha evaluation-only provider boundary
 
 ## Gemini API
 
@@ -123,12 +122,6 @@ Before production use, Kintovo requires Paga account approval, account entitleme
 
 No successful Paga Sandbox or Live transaction is claimed without an evidenced end-to-end callback and reconciliation cycle.
 
-## Busha provider boundary
-
-Busha is represented through the same provider interface as Paga and the mock adapter.
-
-The Busha adapter is intentionally evaluation-only and refuses every live money-moving operation. This prevents unsupported provider operations from being presented as working or executed accidentally.
-
 ## Deployment
 
 Vercel is the current application deployment and Neon provides the PostgreSQL database.
@@ -150,9 +143,9 @@ The coupon issue did not affect the application code or database. Vercel and Neo
 
 ## Current implementation boundary
 
-Implemented in code: responsive public pages; business, specialist, and creator registration; sign-in, email verification, and password reset; organisations, invitations, and scoped membership; separate professional and creator profiles with a per-item portfolio (files, links, contribution, visibility); project briefs, editable deterministic/opt-in AI scoping, human brief review; talent search with language, industry, rate, level, assessment, and engagement filters, sorting, and side-by-side comparison; shortlists, proposals, counteroffers, and versioned agreements; tasks with comments, threaded project messages, private file attachments, milestones with structured revision requests and buyer-proposed partial settlements, change requests, disputes with evidence, assigned reviewers, party/internal notes and confirmed outcomes, and completion; identity verification with Admin-only document access; appeals and correction requests for trust and assessment decisions; creator campaigns with full briefs, fixed/hybrid/commission-only arrangements, attribution windows, refund treatment, signed conversion webhooks (test events), bonus reversal on refunds, and a campaign report; a provider-independent payment adapter interface (mock, Paga Sandbox status, Busha evaluation-only); Paga Sandbox NGN subsidiary accounts, USD-to-NGN collection, Paga-confirmed transfers, and Finance-reviewed withdrawals; notification preferences, email delivery for opted-in categories, and task-deadline reminders via a scheduled job; operations queues, audit-log viewer, webhook/provider monitor, reports, and admin controls. Sandbox operations use test funds; Live is disabled.
+Implemented in code: responsive public pages; business, specialist, and creator registration; sign-in, email verification, and password reset; organisations, invitations, and scoped membership; separate professional and creator profiles with a per-item portfolio (files, links, contribution, visibility); project briefs, editable deterministic/opt-in AI scoping, human brief review; talent search with language, industry, rate, level, assessment, and engagement filters, sorting, and side-by-side comparison; shortlists, proposals, counteroffers, and versioned agreements; tasks with comments, threaded project messages, private file attachments, milestones with structured revision requests and buyer-proposed partial settlements, change requests, disputes with evidence, assigned reviewers, party/internal notes and confirmed outcomes, and completion; identity verification with Admin-only document access; appeals and correction requests for trust and assessment decisions; creator campaigns with full briefs, fixed/hybrid/commission-only arrangements, attribution windows, refund treatment, signed conversion webhooks (test events), bonus reversal on refunds, and a campaign report; a provider-independent payment adapter interface (mock and Paga Sandbox status); Paga Sandbox NGN subsidiary accounts, USD-to-NGN collection, Paga-confirmed transfers, and Finance-reviewed withdrawals; notification preferences, email delivery for opted-in categories, and task-deadline reminders via a scheduled job; operations queues, audit-log viewer, webhook/provider monitor, reports, and admin controls. Sandbox operations use test funds; Live is disabled.
 
-Still incomplete or unverified: malware scanning of uploads and an S3-compatible storage adapter (local disk only); live (non-test) campaign attribution integrations; full browser end-to-end and accessibility testing; definitive payout failure/recovery without a Paga-confirmed reversal; FX difference handling; EUR and GBP payments; Busha integration (evaluation adapter refuses all operations); production email, backups, monitoring, and legal/provider approvals. No Paga Sandbox transaction has been confirmed end to end in this repository. See [the 18 November 2026 gap audit](docs/gap-audit-2026-11-18.md) for the full list.
+Still incomplete or unverified: malware scanning of uploads and an S3-compatible storage adapter (local disk only); live (non-test) campaign attribution integrations; full browser end-to-end and accessibility testing; definitive payout failure/recovery without a Paga-confirmed reversal; FX difference handling; EUR and GBP payments; production email, backups, monitoring, and legal/provider approvals. No Paga Sandbox transaction has been confirmed end to end in this repository. See [the 18 November 2026 gap audit](docs/gap-audit-2026-11-18.md) for the full list.
 
 ## Verification
 
@@ -170,7 +163,7 @@ The HTTP smoke test covered authentication and role-specific page access, includ
 
 The verification process also found and fixed a local single-connection database issue. The database pool now supports an optional `DATABASE_POOL_MAX` setting.
 
-Private production object storage, malware scanning, retention policies, full browser end-to-end testing, accessibility testing, Paga live approval, Paga end-to-end transaction evidence, Busha approval, and provider/legal operations remain release gates.
+Private production object storage, malware scanning, retention policies, full browser end-to-end testing, accessibility testing, Paga live approval, Paga end-to-end transaction evidence, and provider/legal operations remain release gates.
 
 ## Roles and administration
 
