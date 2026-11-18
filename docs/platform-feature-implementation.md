@@ -118,6 +118,23 @@ Permanent bans retain the account and audit record and block that account from s
 
 Creators continue to be discovered through the existing approved-profile campaign invitation flow; they do not apply to project briefs because project engagements currently attach only to Specialist profiles.
 
+## Stage 8 — Paga Sandbox workflows and recovery
+
+### Implemented in code
+
+- Added Paga Sandbox subsidiary-account provisioning for businesses, Specialists, and Creators; signed funding/operation callbacks; and USD-to-NGN collection records.
+- Added NGN subsidiary-account compensation transfers, encrypted bank destinations validated through Paga, Finance-approved withdrawal attempts, signed bank-payout callbacks, and authenticated transaction-status reconciliation.
+- Added reversal reimbursement for withdrawals only when Paga's authenticated status response confirms a reversal for the exact NGN amount. Reimbursement uses a persisted reference and a Paga signed account-credit callback; the withdrawal remains reserved until that callback is recorded. Late settlement after reimbursement becomes an audited exception.
+- Updated payment status labels, Terms, Privacy, README, Paga integration notes, and deployment instructions to distinguish Sandbox test funds from live settlement and simulation.
+- Expanded workspace financial reporting with per-currency pending, simulated, and Paga-confirmed totals.
+
+### Remaining external and release dependencies
+
+- No end-to-end Paga Sandbox transaction has been demonstrated in this repository. Apply all migrations, confirm the account's exact API entitlements and deployment egress allowlist, configure public callbacks, and complete the Sandbox lifecycle before relying on the integration.
+- The automated refund workflow only starts when Paga supplies a reversal identifier for the matching amount. Other unresolved outcomes remain reserved and need manual Paga investigation; do not release or resend them based on a generic non-settled response.
+- Paga Live, EUR/GBP payment rails, secure private uploads/scanning, and identity verification remain disabled or unavailable. These require provider/service selection, credentials, legal/security review, and additional implementation.
+- Automated integration/browser coverage and production deployment readiness remain outstanding. Do not interpret this source update as a passed build or provider test.
+
 ### Validation and delivery
 
 - Source review and `git diff --check` are used. End-to-end browser testing and database checks remain blocked by dependency registry access and no configured test database.

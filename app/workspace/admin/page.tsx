@@ -73,6 +73,6 @@ export default async function AdminPage() {
       </ul><p className="legal-note">Organisation OWNER, ADMIN, PROJECT_MANAGER, and MEMBER roles govern a single business workspace. They do not grant platform operations, finance, or admin access.</p></div></section>
       <section className="panel"><div className="panel-header"><h2>Recently registered accounts</h2><Link className="text-link" href="/workspace/admin/users">Manage accounts</Link></div><div className="panel-content"><ul className="review-history">{recentUsers.map((item) => <li key={item.id}><div><strong>{item.name}</strong><small>{item.email} · {item.platformRole} · joined {item.createdAt.toLocaleDateString("en-NG")} · active {item.lastActiveAt?.toLocaleDateString("en-NG") ?? "not yet"}</small></div><span>{item.bannedAt ? "Banned" : item.disabledAt ? "Suspended" : "Enabled"}</span></li>)}</ul>{!recentUsers.length && <p className="field-note">No accounts have been registered yet.</p>}</div></section>
     </div>
-    <p className="legal-note">Live payment processing, custody, bank withdrawals, private file storage, identity decisions, and provider-specific integrations remain disabled until their external approvals and implementation are complete.</p>
+    <p className="legal-note">Paga Live processing, escrow or conditional custody, private file storage, identity verification, and provider-verified campaign attribution are not available. Paga Sandbox workflows use test funds only and require verified deployment configuration.</p>
   </main>;
 }

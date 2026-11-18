@@ -50,6 +50,14 @@ async function handleOperationNotification(body: Record<string, unknown>) {
     ? await db.pagaPayout.findUnique({ where: { chargeReference: body.externalReferenceNumber as string }, select: { id: true, accountId: true, withdrawalRequestId: true } })
     : null;
   if (payout && payout.accountId !== account.id) return NextResponse.json({ status: "PAYOUT_ACCOUNT_MISMATCH" }, { status: 409 });
+  const reimbursement = event === "SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE"
+    ? await db.pagaPayout.findUnique({ where: { reimbursementReference: body.externalReferenceNumber as string }, include: { withdrawalRequest: true } })
+    : null;
+  if (reimbursement && (reimbursement.accountId !== account.id || reimbursement.amountMinor !== amountMinor)) {
+    return NextResponse.json({ status: "PAYOUT_REIMBURSEMENT_MISMATCH" }, { status: 409 });
+  }
+  if (reimbursement?.reimbursedAt) return NextResponse.json({ status: "SUCCESS" });
+  if (reimbursement && reimbursement.withdrawalRequest.status !== "PROCESSING") return NextResponse.json({ status: "PAYOUT_REIMBURSEMENT_MISMATCH" }, { status: 409 });
   const compensationTransfer = event === "SUBSIDIARY_ACCOUNT_TRANSFER_COMPLETE"
     ? await db.pagaCompensationTransfer.findUnique({ where: { referenceNumber: body.externalReferenceNumber as string }, include: { obligation: true } })
     : null;
@@ -66,12 +74,16 @@ async function handleOperationNotification(body: Record<string, unknown>) {
       const usdCollection = event === "SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE"
         ? await tx.pagaUsdCollection.findUnique({ where: { topUpReference: body.externalReferenceNumber as string }, select: { id: true, status: true, failureReason: true } })
         : null;
+      if (reimbursement && !reimbursement.reimbursedAt) {
+        const requestChanged = await tx.withdrawalRequest.updateMany({ where: { id: reimbursement.withdrawalRequestId, status: "PROCESSING" }, data: { status: "PAYOUT_FAILED", reviewedAt: new Date(), reviewNote: "Paga confirmed the bank transfer reversal and the reimbursement is credited back to the Paga account." } });
+        if (requestChanged.count !== 1) throw new Error("Withdrawal state changed before reimbursement confirmation.");
+      }
       await tx.pagaAccountLedgerEntry.create({
         data: {
           accountId: account.id,
           reference: body.externalReferenceNumber as string,
           direction: expectedType,
-          kind: usdCollection ? "USD_COLLECTION_CREDIT" : event === "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE" ? "WITHDRAWAL_DEBIT" : "ADJUSTMENT",
+          kind: reimbursement ? "REVERSAL" : usdCollection ? "USD_COLLECTION_CREDIT" : event === "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE" ? "WITHDRAWAL_DEBIT" : "ADJUSTMENT",
           amountMinor: ledgerAmountMinor,
           currency: "NGN",
           providerTransactionId: body.externalReferenceNumber as string,
@@ -89,6 +101,11 @@ async function handleOperationNotification(body: Record<string, unknown>) {
       if (compensationTransfer) await tx.pagaAccount.update({ where: { id: compensationTransfer.destinationAccountId }, data: { lastBalanceMinor: null, lastBalanceSyncedAt: null } });
       if (payout) await tx.pagaPayout.update({ where: { id: payout.id }, data: { chargeCompletedAt: new Date(), failureReason: null } });
       if (usdCollection) await tx.pagaUsdCollection.update({ where: { id: usdCollection.id }, data: { status: "COMPLETED", failureReason: usdCollection.failureReason } });
+      if (reimbursement && !reimbursement.reimbursedAt) {
+        await tx.pagaPayout.update({ where: { id: reimbursement.id }, data: { reimbursedAt: new Date(), failureReason: null } });
+        await tx.notification.create({ data: { userId: reimbursement.withdrawalRequest.userId, title: "Withdrawal returned to your Paga account", body: "Paga confirmed the bank payout reversal and the NGN amount has been credited back to your Kintovo Paga account." } });
+        await tx.auditLog.create({ data: { actorId: reimbursement.withdrawalRequest.reviewerId, action: "PAGA_WITHDRAWAL_REIMBURSEMENT_CONFIRMED", entityType: "WithdrawalRequest", entityId: reimbursement.withdrawalRequestId, metadata: { reimbursementReference: body.externalReferenceNumber, amountMinor: amountMinor.toString() } } });
+      }
       if (compensationTransfer) {
         const claimed = await tx.pagaCompensationTransfer.updateMany({ where: { id: compensationTransfer.id, completedAt: null }, data: { completedAt: new Date(), providerTransactionId: body.notificationId as string, failureReason: null } });
         if (claimed.count === 1) {

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
-import { adjustObligation, reconcileLedger, reconcilePagaCompensation, reconcilePagaWithdrawal, reviewWithdrawalRequest, simulateFailure, simulateRefund, simulateSettlement } from "./actions";
+import { adjustObligation, reconcileLedger, reconcilePagaCompensation, reconcilePagaWithdrawal, reimburseReversedWithdrawal, reviewWithdrawalRequest, simulateFailure, simulateRefund, simulateSettlement } from "./actions";
 
 export default async function FinanceOperationsPage() {
   const user = await requireUser();
@@ -28,12 +28,19 @@ export default async function FinanceOperationsPage() {
           {!canApprove && <p className="form-alert">Approval is blocked until the user has an active Paga account and a bank account validated by Paga.</p>}
           {request.reviewNote && <p className="field-note">Latest review detail: {request.reviewNote}</p>}
           {ready ? <form action={reviewWithdrawalRequest} className="review-decision-form"><input type="hidden" name="requestId" value={request.id} /><label>Decision<select name="decision"><option value="APPROVED" disabled={!canApprove}>Approve and send via Paga Sandbox</option><option value="REJECTED">Reject and release reserved balance</option></select></label><label>Review note<textarea name="note" minLength={8} maxLength={1000} required /></label><button className="button button-primary">Submit finance decision</button></form> : <p className="field-note">The 24-hour review hold has not elapsed.</p>}
-        </> : <>
+        </> : request.status === "PROCESSING" ? <>
           <p><strong>Paga payout reference:</strong> {request.pagaPayout?.payoutReference ?? "Not created"}</p>
           {request.pagaPayout && <p><strong>Beneficiary:</strong> {request.pagaPayout.bankDestination.bankName} · account ending {request.pagaPayout.bankDestination.accountNumberLast4}</p>}
+          {request.pagaPayout?.estimatedFeeMinor !== null && request.pagaPayout?.estimatedFeeMinor !== undefined && <p><strong>Estimated payout fee and VAT:</strong> NGN {((Number(request.pagaPayout.estimatedFeeMinor) + Number(request.pagaPayout.estimatedVatMinor ?? 0)) / 100).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>}
           {request.pagaPayout?.failureReason && <p className="form-alert">{request.pagaPayout.failureReason}</p>}
-          {request.pagaPayout && <form action={reconcilePagaWithdrawal}><input type="hidden" name="payoutId" value={request.pagaPayout.id} /><button className="button button-secondary button-small">Check Paga transfer status</button></form>}
-          <p className="field-note">A status check never sends a second payout. The amount remains reserved until Paga confirms settlement.</p>
+          {request.pagaPayout && <form action={reconcilePagaWithdrawal}><input type="hidden" name="payoutId" value={request.pagaPayout.id} /><button className="button button-secondary button-small">{request.pagaPayout.payoutStartedAt ? "Check Paga transfer status" : "Continue payout after balance check"}</button></form>}
+          {request.pagaPayout && request.status === "PROCESSING" && <form action={reimburseReversedWithdrawal} className="review-decision-form"><input type="hidden" name="payoutId" value={request.pagaPayout.id} /><label>Finance reconciliation note<textarea name="note" minLength={12} maxLength={1000} required placeholder="Explain the Paga reversal you are reconciling." /></label><button className="button button-secondary button-small">Reimburse confirmed reversal</button></form>}
+          <p className="field-note">If Paga has not received a bank payout request yet, this action reruns beneficiary, fee, and available-balance checks before sending it. Once submitted, status checks never send a second bank payout. Reimbursement is available only after Paga's authenticated status response confirms a reversal for the exact amount; the withdrawal stays reserved until its signed account-credit callback.</p>
+        </> : <>
+          <p><strong>Paga payout reference:</strong> {request.pagaPayout?.payoutReference ?? "Not created"}</p>
+          {request.pagaPayout?.reimbursedAt && <p className="field-note">Reimbursed to the user's Paga account on {request.pagaPayout.reimbursedAt.toLocaleString("en-NG")}.</p>}
+          {request.pagaPayout?.failureReason && <p className="form-alert">{request.pagaPayout.failureReason}</p>}
+          <p className="field-note">This payout request is closed. Review its audit history before taking further action.</p>
         </>}</div>
       </article>;
     }) : <p className="field-note">No withdrawal requests need finance review.</p>}</section>

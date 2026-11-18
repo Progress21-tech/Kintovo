@@ -55,3 +55,11 @@ Business USD funding instructions are not themselves proof of payment. The busin
 ## Current currency boundaries
 
 Paga subsidiary accounts and bank payouts in this integration are NGN. Paga's separate USD collection flow generates USD bank-transfer instructions that settle as NGN. EUR and GBP funding or withdrawals are not offered by this integration; do not enable those currencies without another verified provider flow.
+
+## Payout failure and reversal recovery
+
+The payout status endpoint can report pending, duplicate, failed, or successful outcomes. A non-settled response is not, by itself, proof that funds returned to the Paga business balance. Finance must use the authenticated status response and Paga's merchant transaction records to confirm the exact withdrawal amount was reversed before starting a reimbursement.
+
+When Paga's status response contains a reversal identifier for the exact NGN amount, the Finance action submits a top-up to the user's subsidiary account using one persisted reference. The withdrawal remains reserved until the signed `SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE` callback credits that exact account and amount. A late settlement callback after reimbursement is recorded as an exception for manual Finance investigation. If Paga does not expose a confirmed reversal, keep the withdrawal processing and resolve it with Paga support; do not release or pay it a second time.
+
+Before submitting a bank payout, Kintovo revalidates the saved beneficiary for the payout amount, reads the merchant's spendable `availableBalance`, and checks it covers the amount plus Paga's fee/VAT estimate. The estimate and actual posted fee can differ; keep the Paga business balance funded and reconcile the provider history. Reimbursement also depends on sufficient spendable merchant balance.

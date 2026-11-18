@@ -37,8 +37,8 @@ Optional integrations:
 
 - `AI_PROVIDER`, `AI_API_BASE_URL`, `AI_MODEL`, `AI_API_KEY`: use only after provider security/privacy review. AI scoping is opt-in per brief and must remain editable.
 - `OBJECT_STORAGE_*`: currently unused. Do not collect private deliverables until storage access controls, expiry, scanning, and deletion are implemented.
-- `PAYMENT_MODE` must remain `simulated`. `PAYMENT_PROVIDER_NAME` and `PAYMENT_WEBHOOK_SECRET` do not enable a provider adapter. The generic webhook route is disabled in simulated mode and is not compatible with Paga callbacks.
-- Paga settings are documented in [the Paga integration audit](./paga-integration-audit.md). Keep `PAGA_ENABLE_SANDBOX=false`; the SHA-512/configuration boundary is not a payment adapter, and no Paga API operation is enabled. Live operations are explicitly disabled in code.
+- The generic `PAYMENT_MODE` webhook is separate from the Paga flows and is not compatible with Paga callbacks.
+- Paga Sandbox settings are documented in [the Paga Sandbox guide](./paga-sandbox.md). Paga requests are enabled only when `PAGA_ENABLE_SANDBOX=true`, Sandbox credentials and callbacks are configured, migrations are applied, and the account is entitled to the operations. Live operations are rejected in code.
 
 Never put production secrets in `.env.example`, source control, client code, logs, or campaign content.
 
@@ -50,8 +50,8 @@ Never put production secrets in `.env.example`, source control, client code, log
 4. Apply reviewed migrations with `npm run db:deploy` as a release step.
 5. Deploy the build behind HTTPS and a trusted reverse proxy.
 6. Check `GET /api/health` from the hosting platform; it returns `200` only when PostgreSQL responds to a simple query.
-7. Verify registration and email delivery, sign-in and recovery, workspace role boundaries, a campaign test flow, and a simulated ledger record in a non-production environment.
-8. Keep the payment mode simulated and never enter real bank or crypto recipient credentials in this application.
+7. Verify registration and email delivery, sign-in and recovery, workspace role boundaries, and a campaign test flow in a non-production environment.
+8. Keep Paga in Sandbox until account provisioning, funding, USD collection, compensation transfer, bank validation, payout callbacks, status reconciliation, and reversal reimbursement have each passed against the verified Sandbox account. Sandbox supports test funds only. Never send real money through this environment.
 
 The app sets baseline browser security headers in `next.config.ts`, including HSTS in production, and uses a PostgreSQL fixed-window limiter for login, registration, and password-reset requests. A separate security review is still required for CSP, limiter thresholds and proxy-sanitized `x-forwarded-for` headers, broader abuse protection, session/cookie deployment settings, dependency advisories, and hosting/network configuration.
 
@@ -64,19 +64,18 @@ The app sets baseline browser security headers in `next.config.ts`, including HS
 - For a suspected credential leak, rotate affected secrets, revoke provider sessions/keys, preserve audit events, review access logs, and follow the organisation's incident process.
 - For a database restore, pause writes, record the recovery point, restore into an isolated instance, validate counts and login, then switch traffic only after review.
 
-## Payment provider evaluation (reviewed 2026-11-09)
+## Payment integration status
 
-Paga is the requested provider and its documented integration boundary has been reviewed; no Paga money movement endpoint has been integrated or enabled. Obtain written product/commercial approval and complete legal, regulatory, operational, reconciliation, and support reviews before enabling any flow.
+The repository now contains Paga Sandbox account, USD-to-NGN funding, subsidiary transfer, bank validation, withdrawal, callback, and reconciliation code. This is an implementation record, not evidence that the production deployment has completed a successful provider transaction. Do not enable Sandbox actions until the migration is applied and Paga has confirmed the required product entitlements, callback configuration, and allowlisted deployment egress. Live operations remain disabled. See [Paga Sandbox setup and the end-to-end checklist](./paga-sandbox.md).
 
-- **Paga Engine:** its official documentation describes Nigerian bank/Paga-wallet payouts from a Paga business balance, account validation, status callbacks, and sandbox/live environments with separate credentials. It uses Paga-specific SHA-512 request/callback hashing and IP allowlisting. Kintovo needs written marketplace approval, Sandbox approval/credentials, a fixed allowlisted egress IP, and a reviewed Paga-specific callback. Current code includes ordered SHA-512/hash verification and environment guards; it does not initiate payments or payouts. See [Money Transfer](https://developer-docs.paga.com/docs/money-transfer-payout), [Hash handling](https://developer-docs.paga.com/docs/handling-hash), and [Get started](https://developer-docs.paga.com/docs/get-started).
-- **Busha:** its official docs describe quote/recipient/transfer steps for payouts, including crypto-to-fiat flows, bearer-token authentication, and webhook/polling status checks. Review settlement assets, fees, destination verification, customer/provider KYC, supported countries, reversals, and custody/crypto implications before deciding whether it fits this product. See [Process payouts](https://docs.busha.co/guide/how-to-guides/process-payouts), [Recipients](https://docs.busha.co/guide/reference/recipients), and [API reference](https://docs.busha.co/reference).
+USD collection settles as NGN; EUR and GBP are not supported. The app does not provide escrow or conditional custody. Sandbox operations use test funds and must not be used for real transfers.
 
 ## Known release blockers
 
 - Node.js build/test/lint and Prisma schema validation have not run on the source system.
-- No Paga payment adapter or Paga webhook route exists; Sandbox endpoints have not been exercised.
+- Paga Sandbox requests and callbacks have not been evidenced as end-to-end verified in this repository; Live operations are disabled.
 - Manual campaign attribution is a reviewable record, not provider-verified conversion tracking.
 - Private file storage, malware scanning, upload limits, and private delivery-file handling are not implemented.
 - Rate limiting, automated integration/E2E tests, accessibility audit, monitoring/alerting, and production email have not been completed.
-- Identity verification and legal review remain external dependencies. Do not represent a published profile or skills score as identity verification.
-- Terms and privacy pages are drafts requiring qualified legal review.
+- Identity verification and legal/provider approval remain external dependencies. Do not represent a published profile or skills score as identity verification.
+- Terms and privacy pages are drafts requiring qualified legal review and deployment-specific provider disclosures.

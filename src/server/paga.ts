@@ -252,6 +252,18 @@ export async function getPagaBanks(referenceNumber: string) {
   });
 }
 
+/** Read spendable funds in the merchant business account before initiating a bank payout. */
+export async function getPagaBusinessAccountBalance(referenceNumber: string) {
+  const config = getPagaConfiguration();
+  const reference = requiredText(referenceNumber, "referenceNumber");
+  return pagaRequest<PagaJson>({
+    url: `${config.businessBaseUrl}/paga-webservices/business-rest/secured/accountBalance`,
+    method: "POST",
+    headers: businessAuth(config, [reference]),
+    body: { referenceNumber: reference },
+  });
+}
+
 export async function validatePagaBankAccount(input: { referenceNumber: string; amountNgn: string; bankPublicId: string; accountNumber: string }) {
   const config = getPagaConfiguration();
   const reference = requiredText(input.referenceNumber, "referenceNumber");

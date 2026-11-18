@@ -1038,6 +1038,12 @@ model PagaPayout {
   chargeCompletedAt     DateTime?
   payoutStartedAt       DateTime?
   payoutCompletedAt     DateTime?
+  providerReversalId    String?
+  reimbursementReference String?  @unique
+  reimbursementStartedAt DateTime?
+  reimbursedAt          DateTime?
+  estimatedFeeMinor     BigInt?
+  estimatedVatMinor     BigInt?
   failureReason         String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

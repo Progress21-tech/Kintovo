@@ -34,6 +34,11 @@ export async function POST(request: Request) {
   const payout = await db.pagaPayout.findUnique({ where: { payoutReference: body.referenceNumber }, include: { withdrawalRequest: true } });
   if (!payout) return NextResponse.json({ status: "UNKNOWN_REFERENCE" }, { status: 404 });
   if (payout.withdrawalRequest.status === "PAID") return NextResponse.json({ status: "SUCCESS" });
+  if (payout.withdrawalRequest.status === "PAYOUT_FAILED" || payout.reimbursedAt) {
+    await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: "Paga sent a settled payout callback after the withdrawal amount was reimbursed. Finance must investigate the possible duplicate disbursement." } });
+    await db.auditLog.create({ data: { actorId: null, action: "PAGA_LATE_SETTLEMENT_AFTER_REIMBURSEMENT", entityType: "WithdrawalRequest", entityId: payout.withdrawalRequestId, metadata: { payoutReference: payout.payoutReference, transactionId: body.transactionId } } });
+    return NextResponse.json({ status: "SUCCESS" });
+  }
   const paidAmountMinor = ngnToMinor(body.amount);
   const confirmed = String(body.responseCode) === "0"
     && body.transactionType === "USER_SEND_CASH_TO_BANK_ACCOUNT_SETTLED"

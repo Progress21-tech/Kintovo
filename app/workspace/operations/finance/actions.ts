@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { createSimulatedSettlement } from "@/server/payments";
-import { approvePagaWithdrawal, reconcilePagaBankTransfer } from "@/server/paga-payouts";
+import { approvePagaWithdrawal, reconcilePagaBankTransfer, reimburseReversedPagaWithdrawal } from "@/server/paga-payouts";
 import { reconcilePagaCompensationTransfer, transferApprovedMilestoneCompensation } from "@/server/paga-compensation";
 
 async function requireFinance() {
@@ -132,6 +132,21 @@ export async function reconcilePagaWithdrawal(formData: FormData) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Paga status check failed.";
     await db.pagaPayout.updateMany({ where: { id: payoutId.data }, data: { failureReason: message.slice(0, 500) } });
+  }
+  revalidatePath("/workspace/operations/finance");
+  revalidatePath("/workspace/earnings");
+}
+
+export async function reimburseReversedWithdrawal(formData: FormData) {
+  const user = await requireFinance();
+  const input = z.object({ payoutId: z.string().min(1), note: z.string().trim().min(12).max(1000) }).safeParse(Object.fromEntries(formData.entries()));
+  if (!input.success) return;
+  try {
+    const result = await reimburseReversedPagaWithdrawal(input.data.payoutId, user.id, input.data.note);
+    await db.pagaPayout.updateMany({ where: { id: input.data.payoutId, reimbursedAt: null }, data: { failureReason: result.message } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Paga reversal could not be confirmed.";
+    await db.pagaPayout.updateMany({ where: { id: input.data.payoutId, reimbursedAt: null }, data: { failureReason: message.slice(0, 500) } });
   }
   revalidatePath("/workspace/operations/finance");
   revalidatePath("/workspace/earnings");

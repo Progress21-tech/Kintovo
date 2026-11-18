@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { db } from "@/server/db";
-import { chargePagaSubsidiaryAccount, depositPagaToBank, getPagaBankTransferStatus, getPagaSubsidiaryAccountBalance } from "@/server/paga";
+import { chargePagaSubsidiaryAccount, depositPagaToBank, getPagaBankTransferStatus, getPagaBusinessAccountBalance, getPagaSubsidiaryAccountBalance, topUpPagaSubsidiaryAccount, validatePagaBankAccount } from "@/server/paga";
 import { decryptPagaBankAccountNumber } from "@/server/paga-bank-vault";
 
-function newReference(prefix: "KNTCHG" | "KNTPAY") {
+function newReference(prefix: "KNTCHG" | "KNTPAY" | "KNTVAL") {
   return `${prefix}${randomBytes(12).toString("hex")}`;
 }
 
@@ -100,6 +100,38 @@ export async function startPagaBankTransfer(payoutId: string) {
     await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: error instanceof Error ? error.message : "Payout callback URL is invalid." } });
     return;
   }
+  let estimatedFeeMinor: bigint;
+  let estimatedVatMinor: bigint;
+  try {
+    const accountNumber = decryptPagaBankAccountNumber(payout.bankDestination.accountNumberCipher);
+    const amountNgn = minorToNgn(payout.amountMinor);
+    const validation = await validatePagaBankAccount({ referenceNumber: newReference("KNTVAL"), amountNgn, bankPublicId: payout.bankDestination.bankPublicId, accountNumber });
+    const normalizedName = (value: unknown) => typeof value === "string" ? value.trim().replaceAll(/\s+/g, " ").toLocaleUpperCase("en-NG") : "";
+    if (Number(validation.responseCode) !== 0
+      || normalizedName(validation.destinationAccountHolderNameAtBank) !== normalizedName(payout.bankDestination.accountHolderName)) {
+      throw new Error("Paga did not revalidate the saved bank beneficiary for this withdrawal. The payout was not sent.");
+    }
+    const fee = ngnToMinor(validation.fee as string | number | undefined);
+    if (fee === null) throw new Error("Paga did not return the payout fee estimate. Finance must reconcile the expected cost before sending.");
+    const taxes = validation.taxes && typeof validation.taxes === "object" && !Array.isArray(validation.taxes) ? validation.taxes as Record<string, unknown> : {};
+    const vatValue = validation.vat ?? taxes.vat;
+    const vat = vatValue === undefined || vatValue === null ? BigInt(0) : ngnToMinor(vatValue as string | number);
+    if (vat === null) throw new Error("Paga returned an invalid payout VAT estimate. The payout was not sent.");
+    const balance = await getPagaBusinessAccountBalance(newReference("KNTCHG"));
+    const availableMinor = ngnToMinor(balance.availableBalance as string | number | undefined);
+    if (String(balance.responseCode) !== "0" || balance.currency !== "NGN" || availableMinor === null) {
+      throw new Error("Paga could not confirm the spendable merchant balance. The bank payout was not sent.");
+    }
+    const requiredMinor = payout.amountMinor + fee + vat;
+    if (availableMinor < requiredMinor) throw new Error("The Paga business balance does not cover the payout plus estimated fee and VAT. Add funds or reconcile before retrying.");
+    estimatedFeeMinor = fee;
+    estimatedVatMinor = vat;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Paga could not validate the bank payout.";
+    await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: reason.slice(0, 500) } });
+    return;
+  }
+  await db.pagaPayout.update({ where: { id: payout.id }, data: { estimatedFeeMinor, estimatedVatMinor } });
   const claimed = await db.pagaPayout.updateMany({ where: { id: payout.id, payoutStartedAt: null, payoutTransactionId: null }, data: { payoutStartedAt: new Date(), failureReason: null } });
   if (claimed.count !== 1) return;
   try {
@@ -138,7 +170,9 @@ export async function reconcilePagaBankTransfer(payoutId: string, reviewerId: st
   }
   if (!payout.payoutStartedAt) {
     await startPagaBankTransfer(payout.id);
-    return { confirmed: false, message: "Paga confirmed the subsidiary-account charge. The bank transfer has been submitted or is being reconciled." };
+    const refreshed = await db.pagaPayout.findUnique({ where: { id: payout.id }, select: { payoutStartedAt: true, failureReason: true } });
+    if (!refreshed?.payoutStartedAt) return { confirmed: false, message: refreshed?.failureReason ?? "Paga confirmed the subsidiary-account charge. The bank payout is still waiting for its validation and balance checks." };
+    return { confirmed: false, message: "Paga confirmed the subsidiary-account charge and the bank payout was submitted. Reconcile it using the same reference." };
   }
   const status = await getPagaBankTransferStatus(payout.payoutReference);
   if (Number(status.responseCode) !== 0) throw new Error(typeof status.message === "string" ? status.message : "Paga could not confirm this transaction status.");
@@ -156,4 +190,67 @@ export async function reconcilePagaBankTransfer(payoutId: string, reviewerId: st
     return result.count;
   });
   return { confirmed: changed === 1, message: changed === 1 ? "Paga confirmed the bank payout." : "This withdrawal was already updated." };
+}
+
+/**
+ * Reimburse a withdrawal only when Paga's authenticated status response includes
+ * a reversal identifier for the exact NGN amount. A generic non-settled status
+ * is not proof of failure; it can mean pending or duplicate.
+ */
+export async function reimburseReversedPagaWithdrawal(payoutId: string, reviewerId: string, note: string) {
+  let payout = await db.pagaPayout.findUnique({ where: { id: payoutId }, include: { withdrawalRequest: true, account: true } });
+  if (!payout || payout.withdrawalRequest.status !== "PROCESSING" || !payout.chargeCompletedAt || !payout.payoutStartedAt) {
+    throw new Error("Only a charged and submitted withdrawal can be reimbursed.");
+  }
+  if (payout.reimbursedAt) return { started: false, message: "Paga already reimbursed this withdrawal." };
+  const accountReference = payout.account.accountReference;
+  const withdrawalRequestId = payout.withdrawalRequestId;
+
+  let reversalId = payout.providerReversalId;
+  if (!payout.reimbursementReference) {
+    const status = await getPagaBankTransferStatus(payout.payoutReference);
+    const amountMinor = ngnToMinor(status.amount as string | number | undefined);
+    if (String(status.responseCode) !== "0"
+      || status.referenceNumber !== payout.payoutReference
+      || status.currency !== "NGN"
+      || amountMinor !== payout.amountMinor
+      || typeof status.reversalId !== "string"
+      || !status.reversalId.trim()) {
+      throw new Error("Paga has not confirmed a reversal for the exact payout amount. Keep the withdrawal reserved and reconcile it in Paga.");
+    }
+    reversalId = status.reversalId;
+  }
+  if (!reversalId) throw new Error("The Paga reversal reference is missing; do not release this withdrawal.");
+
+  const reference = payout.reimbursementReference ?? newReference("KNTCHG");
+  const payoutId = payout.id;
+  payout = await db.$transaction(async (tx) => {
+    const fresh = await tx.pagaPayout.findUnique({ where: { id: payoutId } });
+    if (!fresh || fresh.reimbursedAt) throw new Error("This withdrawal has already been reimbursed.");
+    const changed = await tx.withdrawalRequest.updateMany({ where: { id: fresh.withdrawalRequestId, status: "PROCESSING" }, data: { reviewNote: `Paga reversal ${reversalId} confirmed. Reimbursement is pending. ${note}`.slice(0, 1000) } });
+    if (changed.count !== 1) throw new Error("This withdrawal is no longer processing.");
+    const updated = await tx.pagaPayout.update({ where: { id: fresh.id }, data: { providerReversalId: reversalId, reimbursementReference: fresh.reimbursementReference ?? reference, reimbursementStartedAt: fresh.reimbursementStartedAt ?? new Date(), failureReason: null } });
+    await tx.auditLog.create({ data: { actorId: reviewerId, action: "PAGA_WITHDRAWAL_REVERSAL_CONFIRMED", entityType: "WithdrawalRequest", entityId: fresh.withdrawalRequestId, metadata: { payoutReference: fresh.payoutReference, reversalId, reimbursementReference: updated.reimbursementReference, note } } });
+    return updated;
+  }, { isolationLevel: "Serializable" });
+
+  try {
+    const result = await topUpPagaSubsidiaryAccount({
+      accountReference,
+      referenceNumber: payout.reimbursementReference!,
+      amountNgn: minorToNgn(payout.amountMinor),
+      narration: `Reversed withdrawal ${withdrawalRequestId}`.slice(0, 100),
+    });
+    if (String(result.statusCode) !== "0") {
+      const reason = typeof result.statusMessage === "string" ? result.statusMessage.slice(0, 500) : "Paga has not confirmed the reimbursement top-up. Retry with the same reference after reconciliation.";
+      await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: reason } });
+      return { started: true, message: reason };
+    }
+    await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: "Reimbursement top-up submitted. The withdrawal stays reserved until Paga's signed credit callback arrives." } });
+    return { started: true, message: "Reimbursement submitted. The withdrawal remains reserved until Paga confirms the account credit." };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.slice(0, 500) : "Paga reimbursement result is unconfirmed. Retry with the same reference after reconciliation.";
+    await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: reason } });
+    return { started: true, message: reason };
+  }
 }
