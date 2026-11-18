@@ -54,7 +54,8 @@ export function WorkspaceNav({ business, businessFunding, specialist, creator, o
     ] : []),
     ...(finance ? [{ icon: CircleDollarSign, label: "Finance operations", href: "/workspace/operations/finance" }] : []),
     ...(finance && !operations ? [{ icon: Megaphone, label: "Campaign review", href: "/workspace/operations/campaigns" }] : []),
-    ...(admin ? [{ icon: Settings, label: "Admin console", href: "/workspace/admin" }, { icon: UsersRound, label: "People and accounts", href: "/workspace/admin/users" }, { icon: Settings, label: "Platform settings", href: "/workspace/operations/settings" }] : []),
+    ...(admin ? [{ icon: Settings, label: "Admin console", href: "/workspace/admin" }, { icon: UsersRound, label: "People and accounts", href: "/workspace/admin/users" }, { icon: FileText, label: "Audit log", href: "/workspace/admin/audit" }, { icon: Activity, label: "Webhooks and providers", href: "/workspace/admin/webhooks" }, { icon: Settings, label: "Platform settings", href: "/workspace/operations/settings" }] : []),
+    ...(finance && !admin ? [{ icon: Activity, label: "Webhooks and providers", href: "/workspace/admin/webhooks" }] : []),
     ...(specialist || creator ? [{ icon: UserRound, label: "Profile", href: "/workspace/profile" }] : []),
     { icon: Building2, label: "Organisations", href: "/workspace/organisations" },
   ];

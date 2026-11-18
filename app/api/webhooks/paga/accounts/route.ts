@@ -103,8 +103,8 @@ async function handleOperationNotification(body: Record<string, unknown>) {
       if (usdCollection) await tx.pagaUsdCollection.update({ where: { id: usdCollection.id }, data: { status: "COMPLETED", failureReason: usdCollection.failureReason } });
       if (reimbursement && !reimbursement.reimbursedAt) {
         await tx.pagaPayout.update({ where: { id: reimbursement.id }, data: { reimbursedAt: new Date(), failureReason: null } });
-        await tx.notification.create({ data: { userId: reimbursement.withdrawalRequest.userId, title: "Withdrawal returned to your Paga account", body: "Paga confirmed the bank payout reversal and the NGN amount has been credited back to your Kintovo Paga account." } });
-        await tx.auditLog.create({ data: { actorId: reimbursement.withdrawalRequest.reviewerId, action: "PAGA_WITHDRAWAL_REIMBURSEMENT_CONFIRMED", entityType: "WithdrawalRequest", entityId: reimbursement.withdrawalRequestId, metadata: { reimbursementReference: body.externalReferenceNumber, amountMinor: amountMinor.toString() } } });
+        await tx.notification.create({ data: { category: "PAYMENT", userId: reimbursement.withdrawalRequest.userId, title: "Withdrawal returned to your Paga account", body: "Paga confirmed the bank payout reversal and the NGN amount has been credited back to your Kintovo Paga account." } });
+        await tx.auditLog.create({ data: { actorId: reimbursement.withdrawalRequest.reviewerId, action: "PAGA_WITHDRAWAL_REIMBURSEMENT_CONFIRMED", entityType: "WithdrawalRequest", entityId: reimbursement.withdrawalRequestId, metadata: { reimbursementReference: String(body.externalReferenceNumber ?? ""), amountMinor: amountMinor.toString() } } });
       }
       if (compensationTransfer) {
         const claimed = await tx.pagaCompensationTransfer.updateMany({ where: { id: compensationTransfer.id, completedAt: null }, data: { completedAt: new Date(), providerTransactionId: body.notificationId as string, failureReason: null } });
@@ -112,7 +112,7 @@ async function handleOperationNotification(body: Record<string, unknown>) {
           await tx.compensationObligation.update({ where: { id: compensationTransfer.obligationId }, data: { status: "PROVIDER_CONFIRMED_PAID", provider: "PAGA", simulated: false, paidAt: new Date(), failureReason: null } });
           const existing = await tx.ledgerEntry.findFirst({ where: { obligationId: compensationTransfer.obligationId, kind: "PROVIDER_SETTLEMENT" }, select: { id: true } });
           if (!existing) await tx.ledgerEntry.create({ data: { obligationId: compensationTransfer.obligationId, kind: "PROVIDER_SETTLEMENT", amount: compensationTransfer.obligation.amount, currency: compensationTransfer.obligation.currency, simulated: false, providerEventId: body.notificationId as string } });
-          if (compensationTransfer.obligation.recipientId) await tx.notification.create({ data: { userId: compensationTransfer.obligation.recipientId, title: "Compensation received", body: "Paga confirmed the NGN transfer to your Kintovo Paga account." } });
+          if (compensationTransfer.obligation.recipientId) await tx.notification.create({ data: { category: "PAYMENT", userId: compensationTransfer.obligation.recipientId, title: "Compensation received", body: "Paga confirmed the NGN transfer to your Kintovo Paga account." } });
         }
       }
     });

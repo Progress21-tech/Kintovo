@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const changed = await tx.withdrawalRequest.updateMany({ where: { id: payout.withdrawalRequestId, status: "PROCESSING" }, data: { status: "PAID" } });
     if (changed.count !== 1) return;
     await tx.pagaPayout.update({ where: { id: payout.id }, data: { payoutTransactionId: body.transactionId as string, payoutCompletedAt: Number.isNaN(completedAt.getTime()) ? new Date() : completedAt, failureReason: null } });
-    await tx.notification.create({ data: { userId: payout.withdrawalRequest.userId, title: "Withdrawal paid", body: "Paga confirmed that your bank payout settled." } });
+    await tx.notification.create({ data: { category: "PAYMENT", userId: payout.withdrawalRequest.userId, title: "Withdrawal paid", body: "Paga confirmed that your bank payout settled." } });
   });
   return NextResponse.json({ status: "SUCCESS" });
 }

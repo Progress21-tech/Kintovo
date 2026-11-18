@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Private uploads (deliverables, evidence, portfolio files) are posted through Server Actions.
+  // Keep in step with UPLOAD_MAX_MB (default 15 MB) plus form overhead.
+  experimental: { serverActions: { bodySizeLimit: "16mb" } },
   async headers() {
     return [{
       source: "/:path*",

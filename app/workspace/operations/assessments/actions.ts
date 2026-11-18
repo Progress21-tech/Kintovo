@@ -15,7 +15,7 @@ export async function createAssessment(formData: FormData) {
   if (!profile) return;
   const assessment = await db.skillsAssessment.create({ data: { professionalProfileId: profile.id, title: input.data.title, category: input.data.category, requiredSkills: input.data.requiredSkills.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 20), instructions: input.data.instructions } });
   await db.$transaction([
-    db.notification.create({ data: { userId: profile.userId, title: "Practical assessment requested", body: `Complete “${assessment.title}” and submit a reviewable evidence link.` } }),
+    db.notification.create({ data: { category: "TRUST", userId: profile.userId, title: "Practical assessment requested", body: `Complete “${assessment.title}” and submit a reviewable evidence link.` } }),
     db.auditLog.create({ data: { actorId: user.id, action: "SKILLS_ASSESSMENT_CREATED", entityType: "SkillsAssessment", entityId: assessment.id } }),
   ]);
   revalidatePath("/workspace/operations/assessments");
@@ -36,7 +36,7 @@ export async function reviewAssessment(formData: FormData) {
   await db.$transaction(async (tx) => {
     await tx.skillsAssessment.update({ where: { id: assessment.id }, data: { status: input.data.status, score, reviewerId: user.id, reviewerNote: input.data.reviewerNote, reviewedAt: new Date() } });
     if (input.data.status === "APPROVED") await tx.professionalProfile.update({ where: { id: assessment.professionalProfileId }, data: { expertiseLevel: awardedLevel } });
-    await tx.notification.create({ data: { userId: assessment.professional.userId, title: `Assessment ${input.data.status.toLowerCase()}`, body: `${input.data.reviewerNote} Score: ${score}/100.${input.data.status === "APPROVED" ? ` Specialist level is now ${awardedLevel.replaceAll("_", " ")}.` : ""}` } });
+    await tx.notification.create({ data: { category: "TRUST", userId: assessment.professional.userId, title: `Assessment ${input.data.status.toLowerCase()}`, body: `${input.data.reviewerNote} Score: ${score}/100.${input.data.status === "APPROVED" ? ` Specialist level is now ${awardedLevel.replaceAll("_", " ")}.` : ""}` } });
     await tx.auditLog.create({ data: { actorId: user.id, action: `SKILLS_ASSESSMENT_${input.data.status}`, entityType: "SkillsAssessment", entityId: assessment.id, metadata: { score, awardedLevel } } });
   });
   revalidatePath("/workspace/operations/assessments");

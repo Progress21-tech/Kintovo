@@ -3,7 +3,7 @@ export default function PrivacyPage() {
     <span className="eyebrow">Draft · version 2026-11-18</span>
     <h1>Privacy Notice</h1>
     <p className="lead">This draft describes personal information used by the current Kintovo product. It must be completed and reviewed by qualified privacy counsel before public production use.</p>
-    <div className="legal-note">Draft for legal review · The controller's legal identity, contact address, hosting locations, subprocessors, retention schedule, and user-rights process must be confirmed before launch.</div>
+    <div className="legal-note">Draft for legal review · The controller&apos;s legal identity, contact address, hosting locations, subprocessors, retention schedule, and user-rights process must be confirmed before launch.</div>
     <h2>1. Information used</h2>
     <ul>
       <li><strong>Account and contact information:</strong> name, email, optional phone number, email-verification state, sign-in and policy-acceptance records.</li>

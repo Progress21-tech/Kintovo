@@ -65,3 +65,20 @@ export async function reviewComplaint(formData: FormData) {
   revalidatePath("/workspace/operations/complaints");
   revalidatePath("/workspace/settings");
 }
+
+export async function saveNotificationPreferences(formData: FormData) {
+  const user = await requireUser();
+  const { notificationCategories } = await import("@/server/notifications");
+  const rows = Object.entries(notificationCategories).map(([category, meta]) => ({
+    userId: user.id,
+    category,
+    inApp: meta.required ? true : formData.get(`inApp:${category}`) === "on",
+    email: formData.get(`email:${category}`) === "on",
+  }));
+  await db.$transaction([
+    ...rows.map((row) => db.notificationPreference.upsert({ where: { userId_category: { userId: row.userId, category: row.category } }, create: row, update: { inApp: row.inApp, email: row.email } })),
+    db.auditLog.create({ data: { actorId: user.id, action: "NOTIFICATION_PREFERENCES_UPDATED", entityType: "User", entityId: user.id } }),
+  ]);
+  revalidatePath("/workspace/settings");
+  redirect("/workspace/settings?preferences=saved#notification-preferences");
+}

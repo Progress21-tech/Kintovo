@@ -4,10 +4,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
+function daysAgo(days: number) { return new Date(Date.now() - days * 24 * 60 * 60 * 1000); }
+
 export default async function AdminPage() {
   const user = await requireUser();
   if (user.platformRole !== "ADMIN") redirect("/workspace");
-  const activeSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const activeSince = daysAgo(30);
   const [accounts, activeUsers, businesses, submittedSpecialists, approvedSpecialists, submittedCreators, approvedCreators, approvedBusinesses, pendingBusinessGoals, openReviews, openDisputes, paymentExceptions, recentAudit, recentUsers, roleCounts, paymentTotals, ratingStats, campaignRatingStats, pendingWithdrawals] = await Promise.all([
     db.user.count(),
     db.user.count({ where: { lastActiveAt: { gte: activeSince }, disabledAt: null, bannedAt: null } }),

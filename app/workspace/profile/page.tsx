@@ -4,12 +4,13 @@ import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { ProfileForm, type ProfileValues } from "./ProfileForm";
+import { PortfolioManager } from "./PortfolioManager";
 
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ context?: string }> }) {
   const user = await requireUser();
   const { context: requestedContext } = await searchParams;
   const [specialist, creator, businessMembership] = await Promise.all([
-    db.professionalProfile.findUnique({ where: { userId: user.id }, include: { portfolio: { orderBy: { createdAt: "asc" } } } }),
+    db.professionalProfile.findUnique({ where: { userId: user.id }, include: { portfolio: { include: { files: { where: { deletedAt: null }, select: { id: true, originalName: true, sizeBytes: true } } }, orderBy: { createdAt: "asc" } } } }),
     db.creatorProfile.findUnique({ where: { userId: user.id } }),
     db.organisationMembership.findFirst({ where: { userId: user.id }, select: { id: true } }),
   ]);
@@ -17,7 +18,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const context: "SPECIALIST" | "CREATOR" = specialist ? "SPECIALIST" : creator ? "CREATOR" : requestedContext === "CREATOR" ? "CREATOR" : "SPECIALIST";
   const profile: ProfileValues = context === "SPECIALIST" ? {
     ...specialist,
-    portfolio: specialist?.portfolio.map((item) => `${item.title} | ${item.url ?? ""} | ${item.contribution ?? ""} | ${item.isPublic ? "public" : "private"}`).join("\n"),
+    portfolio: undefined,
   } : {
     biography: creator?.biography,
     platforms: creator?.platforms,
@@ -40,5 +41,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     </div> : <p className="profile-context-lock">This account is set up as a {context === "SPECIALIST" ? "specialist" : "creator"} account. Your profile workspace is limited to that role.</p>}
     <div className="profile-status-row"><span className="status-pill">{submittedAt ? "Onboarding submitted" : "Private draft"}</span>{currentStatus && currentStatus !== "NOT_STARTED" && <span className={`status-pill ${currentStatus === "VERIFIED" ? "green" : currentStatus === "IN_REVIEW" ? "blue" : currentStatus === "REJECTED" ? "amber" : ""}`}>{currentStatus.replaceAll("_", " ")}</span>}<span className="field-note">Profiles are not visible in discovery until an authorised review and publication.</span></div>
     <ProfileForm profile={profile} context={context} />
+    {specialist && <PortfolioManager items={specialist.portfolio.map((item) => ({ id: item.id, title: item.title, description: item.description, category: item.category, occurredAt: item.occurredAt?.toLocaleDateString("en-NG", { month: "short", year: "numeric" }) ?? null, url: item.url, contribution: item.contribution, skills: item.skills, isPublic: item.isPublic, files: item.files }))} />}
   </main>;
 }

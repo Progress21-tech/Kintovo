@@ -1,0 +1,33 @@
+# Local full-stack run: PostgreSQL + Kintovo.
+#   AUTH_SECRET=$(openssl rand -base64 32) docker compose up --build
+# Then optionally load fictional demo data:
+#   docker compose exec -e ENABLE_DEMO_SEED=1 -e NODE_ENV=development app npx tsx prisma/seed.ts
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kintovo
+      POSTGRES_PASSWORD: kintovo-local-only
+      POSTGRES_DB: kintovo
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kintovo -d kintovo"]
+      interval: 5s
+      retries: 10
+  app:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["3000:3000"]
+    environment:
+      DATABASE_URL: postgresql://kintovo:kintovo-local-only@db:5432/kintovo?schema=public
+      DIRECT_URL: postgresql://kintovo:kintovo-local-only@db:5432/kintovo?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to a long random value}
+      AUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: "true"
+      PAYMENT_MODE: simulated
+      PAGA_ENABLE_SANDBOX: "false"
+    volumes: ["uploads:/data/private-uploads"]
+volumes:
+  pgdata:
+  uploads:

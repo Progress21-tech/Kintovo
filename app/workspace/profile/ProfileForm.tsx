@@ -123,7 +123,7 @@ export function ProfileForm({ profile, context }: { profile: ProfileValues; cont
           <label>Preferred working arrangement<input name="preferredArrangement" defaultValue={profile.preferredArrangement ?? ""} placeholder="Remote, hybrid, on-site" maxLength={120} /></label>
           <label className="span-two">Preferred engagement types<input name="preferredEngagements" defaultValue={(profile.preferredEngagements ?? []).join(", ")} placeholder="Team project, individual engagement" maxLength={300} /></label>
           <label>Indicative rate in NGN · {profile.expertiseLevel?.replaceAll("_", " ") ?? "LEVEL 1"}<input type="number" name="rate" min="0" step="1" defaultValue={profile.indicativeRate ?? ""} placeholder="Optional" /></label>
-          <label className="span-two">Portfolio items <span className="field-note">One per line: title | https://link | your contribution | public. Items remain private unless you add “public”.</span><textarea name="portfolio" defaultValue={profile.portfolio ?? ""} placeholder={"Nigeria audience research | https://example.com/work | Led interviews and synthesis | public"} maxLength={5000} /></label>
+          <p className="span-two field-note">Add portfolio items, files, and visibility in the Portfolio section below this form.</p>
         </div>
       </div>
       <section className="profile-ai-coach" aria-labelledby="profile-ai-title">

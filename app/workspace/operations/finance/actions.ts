@@ -112,7 +112,7 @@ export async function reviewWithdrawalRequest(formData: FormData) {
     await db.$transaction(async (tx) => {
       const changed = await tx.withdrawalRequest.updateMany({ where: { id: request.id, status: "PENDING_REVIEW", reviewAfter: { lte: new Date() } }, data: { status: "REJECTED", reviewedAt: new Date(), reviewerId: user.id, reviewNote: input.data.note } });
       if (changed.count !== 1) return;
-      await tx.notification.create({ data: { userId: request.userId, title: "Withdrawal request rejected", body: `${input.data.note} The reserved amount is available again.` } });
+      await tx.notification.create({ data: { category: "PAYMENT", userId: request.userId, title: "Withdrawal request rejected", body: `${input.data.note} The reserved amount is available again.` } });
       await tx.auditLog.create({ data: { actorId: user.id, action: "WITHDRAWAL_REJECTED", entityType: "WithdrawalRequest", entityId: request.id, metadata: { amount: request.amount, currency: request.currency, note: input.data.note } } });
     });
   }

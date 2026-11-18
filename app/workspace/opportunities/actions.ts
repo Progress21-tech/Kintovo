@@ -19,7 +19,7 @@ export async function expressInterestInProject(formData: FormData) {
   if (membership || existing) return;
   await db.$transaction(async (tx) => {
     const created = await tx.engagement.create({ data: { projectId: project.id, professionalProfileId: profile.id, createdById: user.id, status: "PROPOSED", message: "Specialist expressed interest through approved project discovery." } });
-    await tx.notification.create({ data: { userId: project.createdById, title: "Specialist expressed interest", body: `A reviewed Specialist is interested in “${project.title}”. Open the project workspace to review their profile and proposal.` } });
+    await tx.notification.create({ data: { category: "PROPOSAL", userId: project.createdById, title: "Specialist expressed interest", body: `A reviewed Specialist is interested in “${project.title}”. Open the project workspace to review their profile and proposal.` } });
     await tx.auditLog.create({ data: { actorId: user.id, action: "SPECIALIST_INTERESTED_IN_PROJECT", entityType: "Engagement", entityId: created.id, metadata: { projectId: project.id } } });
   });
   revalidatePath("/workspace/opportunities");

@@ -26,7 +26,7 @@ export async function inviteShortlistedProfessional(formData: FormData) {
     const created = await tx.engagement.create({
       data: { projectId: project.id, professionalProfileId: profile.id, createdById: user.id, status: "INVITED", message: input.data.message || null },
     });
-    await tx.notification.create({ data: { userId: profile.userId, title: "Project invitation", body: "A business invited you to review a project opportunity on Kintovo." } });
+    await tx.notification.create({ data: { category: "PROPOSAL", userId: profile.userId, title: "Project invitation", body: "A business invited you to review a project opportunity on Kintovo." } });
     await tx.auditLog.create({ data: { actorId: user.id, action: "PROFESSIONAL_INVITED_TO_PROJECT", entityType: "Engagement", entityId: created.id } });
     return created;
   });
@@ -88,7 +88,7 @@ export async function submitProposal(_state: { error?: string; success?: string 
       status: "OPEN", expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14),
     } });
     await tx.engagement.update({ where: { id: engagement.id }, data: { status: version > 1 ? "NEGOTIATING" : "PROPOSED" } });
-    await tx.notification.create({ data: { userId: isTalent ? engagement.createdById : engagement.professional.userId, title: version > 1 ? "Counteroffer received" : "Proposal received", body: "Open the project workspace to review the updated proposal." } });
+    await tx.notification.create({ data: { category: "PROPOSAL", userId: isTalent ? engagement.createdById : engagement.professional.userId, title: version > 1 ? "Counteroffer received" : "Proposal received", body: "Open the project workspace to review the updated proposal." } });
     await tx.auditLog.create({ data: { actorId: user.id, action: version > 1 ? "PROPOSAL_COUNTERED" : "PROPOSAL_SUBMITTED", entityType: "Proposal", entityId: proposal.id, metadata: { version } } });
   });
   revalidatePath("/workspace/opportunities");
@@ -154,7 +154,7 @@ export async function acceptProposal(formData: FormData) {
     } });
     await tx.proposal.update({ where: { id: proposal.id }, data: { status: "ACCEPTED" } });
     await tx.engagement.update({ where: { id: proposal.engagementId }, data: { status: "AGREED" } });
-    await tx.notification.create({ data: { userId: proposal.authorId, title: "Proposal accepted", body: "The other party accepted your proposal. Review and accept the agreement terms to begin." } });
+    await tx.notification.create({ data: { category: "PROPOSAL", userId: proposal.authorId, title: "Proposal accepted", body: "The other party accepted your proposal. Review and accept the agreement terms to begin." } });
     await tx.auditLog.create({ data: { actorId: user.id, action: "PROPOSAL_ACCEPTED_AGREEMENT_CREATED", entityType: "Agreement", entityId: created.id } });
     return created;
   });
@@ -189,7 +189,7 @@ export async function acceptAgreement(formData: FormData) {
       await tx.project.update({ where: { id: agreement.engagement.project.id }, data: { status: "ACTIVE" } });
       const existingMilestone = await tx.milestone.findFirst({ where: { sourceAgreementId: agreement.id } });
       if (!existingMilestone) await tx.milestone.create({ data: { sourceAgreementId: agreement.id, projectId: agreement.engagement.project.id, assignedProfileId: agreement.engagement.professional.id, title: agreement.version === 1 ? "Agreed project deliverables" : `Amended deliverables · agreement v${agreement.version}`, description: agreement.terms!.scope, deliverables: agreement.terms!.deliverables, amount: agreement.terms!.amount, currency: agreement.terms!.currency, dueAt: agreement.terms!.dueAt, acceptanceCriteria: agreement.terms!.acceptanceCriteria, revisionAllowance: agreement.terms!.revisionAllowance } });
-      await tx.notification.create({ data: { userId: isBuyer ? agreement.engagement.professional.userId : agreement.engagement.createdById, title: "Agreement active", body: "Both parties accepted the agreement. The project workspace is now active." } });
+      await tx.notification.create({ data: { category: "PROPOSAL", userId: isBuyer ? agreement.engagement.professional.userId : agreement.engagement.createdById, title: "Agreement active", body: "Both parties accepted the agreement. The project workspace is now active." } });
     }
   });
   revalidatePath(`/workspace/projects/${agreement.engagement.project.id}`);

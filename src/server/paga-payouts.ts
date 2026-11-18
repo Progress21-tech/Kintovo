@@ -63,7 +63,7 @@ export async function approvePagaWithdrawal(input: { requestId: string; reviewer
     if (changed.count !== 1) throw new Error("This withdrawal has already been reviewed.");
     const current = await tx.pagaPayout.findUnique({ where: { withdrawalRequestId: request.id } });
     const created = current ?? await tx.pagaPayout.create({ data: { withdrawalRequestId: request.id, accountId: account.id, bankDestinationId: bank.id, currency: "NGN", amountMinor: payoutAmountMinor, chargeReference, payoutReference, chargeStartedAt: new Date() } });
-    await tx.notification.create({ data: { userId: request.userId, title: "Withdrawal approved and processing", body: "Finance approved your withdrawal. Paga is processing the bank transfer; the balance remains reserved until Paga confirms the result." } });
+    await tx.notification.create({ data: { category: "PAYMENT", userId: request.userId, title: "Withdrawal approved and processing", body: "Finance approved your withdrawal. Paga is processing the bank transfer; the balance remains reserved until Paga confirms the result." } });
     await tx.auditLog.create({ data: { actorId: input.reviewerId, action: "PAGA_WITHDRAWAL_PROCESSING_STARTED", entityType: "WithdrawalRequest", entityId: request.id, metadata: { amount: request.amount, currency: request.currency, payoutReference: created.payoutReference } } });
     return created;
   }, { isolationLevel: "Serializable" });
@@ -185,7 +185,7 @@ export async function reconcilePagaBankTransfer(payoutId: string, reviewerId: st
     const result = await tx.withdrawalRequest.updateMany({ where: { id: payout.withdrawalRequestId, status: "PROCESSING" }, data: { status: "PAID" } });
     if (result.count !== 1) return 0;
     await tx.pagaPayout.update({ where: { id: payout.id }, data: { payoutTransactionId: typeof status.transactionId === "string" ? status.transactionId : payout.payoutTransactionId, payoutCompletedAt: completedAt, failureReason: null } });
-    await tx.notification.create({ data: { userId: payout.withdrawalRequest.userId, title: "Withdrawal paid", body: "Paga confirmed that your bank payout settled." } });
+    await tx.notification.create({ data: { category: "PAYMENT", userId: payout.withdrawalRequest.userId, title: "Withdrawal paid", body: "Paga confirmed that your bank payout settled." } });
     await tx.auditLog.create({ data: { actorId: reviewerId, action: "PAGA_WITHDRAWAL_CONFIRMED_BY_STATUS", entityType: "WithdrawalRequest", entityId: payout.withdrawalRequestId, metadata: { payoutReference: payout.payoutReference, transactionId: status.transactionId ?? null } } });
     return result.count;
   });
@@ -198,7 +198,7 @@ export async function reconcilePagaBankTransfer(payoutId: string, reviewerId: st
  * is not proof of failure; it can mean pending or duplicate.
  */
 export async function reimburseReversedPagaWithdrawal(payoutId: string, reviewerId: string, note: string) {
-  let payout = await db.pagaPayout.findUnique({ where: { id: payoutId }, include: { withdrawalRequest: true, account: true } });
+  const payout = await db.pagaPayout.findUnique({ where: { id: payoutId }, include: { withdrawalRequest: true, account: true } });
   if (!payout || payout.withdrawalRequest.status !== "PROCESSING" || !payout.chargeCompletedAt || !payout.payoutStartedAt) {
     throw new Error("Only a charged and submitted withdrawal can be reimbursed.");
   }
@@ -224,7 +224,7 @@ export async function reimburseReversedPagaWithdrawal(payoutId: string, reviewer
 
   const reference = payout.reimbursementReference ?? newReference("KNTCHG");
   const payoutRecordId = payout.id;
-  payout = await db.$transaction(async (tx) => {
+  const reimbursing = await db.$transaction(async (tx) => {
     const fresh = await tx.pagaPayout.findUnique({ where: { id: payoutRecordId } });
     if (!fresh || fresh.reimbursedAt) throw new Error("This withdrawal has already been reimbursed.");
     const changed = await tx.withdrawalRequest.updateMany({ where: { id: fresh.withdrawalRequestId, status: "PROCESSING" }, data: { reviewNote: `Paga reversal ${reversalId} confirmed. Reimbursement is pending. ${note}`.slice(0, 1000) } });
@@ -237,20 +237,20 @@ export async function reimburseReversedPagaWithdrawal(payoutId: string, reviewer
   try {
     const result = await topUpPagaSubsidiaryAccount({
       accountReference,
-      referenceNumber: payout.reimbursementReference!,
-      amountNgn: minorToNgn(payout.amountMinor),
+      referenceNumber: reimbursing.reimbursementReference!,
+      amountNgn: minorToNgn(reimbursing.amountMinor),
       narration: `Reversed withdrawal ${withdrawalRequestId}`.slice(0, 100),
     });
     if (String(result.statusCode) !== "0") {
       const reason = typeof result.statusMessage === "string" ? result.statusMessage.slice(0, 500) : "Paga has not confirmed the reimbursement top-up. Retry with the same reference after reconciliation.";
-      await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: reason } });
+      await db.pagaPayout.update({ where: { id: reimbursing.id }, data: { failureReason: reason } });
       return { started: true, message: reason };
     }
-    await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: "Reimbursement top-up submitted. The withdrawal stays reserved until Paga's signed credit callback arrives." } });
+    await db.pagaPayout.update({ where: { id: reimbursing.id }, data: { failureReason: "Reimbursement top-up submitted. The withdrawal stays reserved until Paga's signed credit callback arrives." } });
     return { started: true, message: "Reimbursement submitted. The withdrawal remains reserved until Paga confirms the account credit." };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 500) : "Paga reimbursement result is unconfirmed. Retry with the same reference after reconciliation.";
-    await db.pagaPayout.update({ where: { id: payout.id }, data: { failureReason: reason } });
+    await db.pagaPayout.update({ where: { id: reimbursing.id }, data: { failureReason: reason } });
     return { started: true, message: reason };
   }
 }

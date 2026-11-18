@@ -22,3 +22,19 @@ const milestoneTransitions: Record<MilestoneState, readonly MilestoneState[]> = 
 
 export function canTransitionTask(from: TaskState, to: TaskState) { return taskTransitions[from].includes(to); }
 export function canTransitionMilestone(from: MilestoneState, to: MilestoneState) { return milestoneTransitions[from].includes(to); }
+
+/**
+ * Partial settlement: the buyer may propose settling a submitted, in-review, or
+ * disputed milestone for less than the agreed amount. It only takes effect when the
+ * assigned professional accepts, and it never exceeds the agreed amount.
+ */
+export function canProposeSettlement(status: MilestoneState) { return status === "SUBMITTED" || status === "IN_REVIEW" || status === "DISPUTED"; }
+
+export function validateSettlementAmount(amount: number, agreedAmount: number): string | null {
+  if (!Number.isSafeInteger(amount) || amount <= 0) return "Enter a whole settlement amount greater than zero.";
+  if (amount >= agreedAmount) return "A partial settlement must be less than the agreed milestone amount. Approve the milestone to settle in full.";
+  return null;
+}
+
+/** A revision request is allowed only while the agreed revision allowance remains. */
+export function canRequestRevision(revisionCount: number, revisionAllowance: number) { return revisionCount < revisionAllowance; }

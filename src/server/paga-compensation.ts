@@ -122,7 +122,7 @@ async function confirmTransfer(transferId: string, transactionId: string, source
     if (claimed.count !== 1) return;
     await tx.compensationObligation.update({ where: { id: transfer.obligationId }, data: { status: "PROVIDER_CONFIRMED_PAID", provider: "PAGA", simulated: false, paidAt: new Date(), failureReason: null } });
     await tx.ledgerEntry.create({ data: { obligationId: transfer.obligationId, kind: "PROVIDER_SETTLEMENT", amount: transfer.obligation.amount, currency: transfer.obligation.currency, simulated: false, providerEventId: transactionId } });
-    if (transfer.obligation.recipientId) await tx.notification.create({ data: { userId: transfer.obligation.recipientId, title: "Compensation received", body: "Paga confirmed the NGN transfer to your Kintovo Paga account." } });
+    if (transfer.obligation.recipientId) await tx.notification.create({ data: { category: "PAYMENT", userId: transfer.obligation.recipientId, title: "Compensation received", body: "Paga confirmed the NGN transfer to your Kintovo Paga account." } });
   });
 }
 

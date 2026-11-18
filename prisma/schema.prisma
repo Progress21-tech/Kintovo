@@ -214,6 +214,28 @@ enum CampaignAttributionStatus {
   PENDING
   APPROVED
   REJECTED
+  REFUNDED
+}
+enum FileAssetPurpose {
+  PORTFOLIO
+  MILESTONE_SUBMISSION
+  PROJECT_MESSAGE
+  DISPUTE_EVIDENCE
+  TRUST_EVIDENCE
+  IDENTITY_EVIDENCE
+  CAMPAIGN_CONTENT
+}
+enum SettlementProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+enum AppealStatus {
+  OPEN
+  UNDER_REVIEW
+  UPHELD
+  REJECTED
 }
 
 model User {
@@ -265,6 +287,14 @@ model User {
   withdrawalsReviewed WithdrawalRequest[] @relation("WithdrawalReviewer")
   pagaAccount     PagaAccount? @relation("PagaUserAccount")
   pagaBankDestinations PagaBankDestination[]
+  files           FileAsset[]  @relation("FileOwner")
+  notificationPreferences NotificationPreference[]
+  settlementProposals MilestoneSettlementProposal[] @relation("SettlementProposer")
+  settlementResponses MilestoneSettlementProposal[] @relation("SettlementResponder")
+  appeals         TrustAppeal[] @relation("AppealAuthor")
+  appealsReviewed TrustAppeal[] @relation("AppealReviewer")
+  disputesAssigned Dispute[]    @relation("DisputeReviewer")
+  disputeNotes    DisputeNote[]
   @@index([lastActiveAt, disabledAt, bannedAt])
 }
 
@@ -381,6 +411,7 @@ model PortfolioItem {
   isPublic    Boolean             @default(false)
   createdAt   DateTime            @default(now())
   profile     ProfessionalProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  files       FileAsset[]
 }
 
 model Project {
@@ -406,6 +437,7 @@ model Project {
   disputes       Dispute[]
   reviews        ProjectReview[]
   compensationObligations CompensationObligation[]
+  files          FileAsset[]
   @@index([organisationId, status, updatedAt])
 }
 
@@ -562,6 +594,7 @@ model Milestone {
   submissions        Submission[]
   events             MilestoneEvent[]
   disputes           Dispute[]
+  settlementProposals MilestoneSettlementProposal[]
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   @@index([projectId, status, dueAt])
@@ -577,6 +610,7 @@ model Submission {
   createdAt     DateTime  @default(now())
   milestone     Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
   submittedBy   User      @relation(fields: [submittedById], references: [id])
+  files         FileAsset[]
 }
 
 model MilestoneEvent {
@@ -620,6 +654,8 @@ model TrustReview {
   professional          ProfessionalProfile?  @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
   creator               CreatorProfile?       @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
   reviewer              User?                 @relation("TrustReviewer", fields: [reviewerId], references: [id])
+  files                 FileAsset[]
+  appeals               TrustAppeal[]
   @@index([status, submittedAt])
 }
 
@@ -640,6 +676,7 @@ model SkillsAssessment {
   reviewedAt            DateTime?
   createdAt             DateTime            @default(now())
   professional          ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  appeals               TrustAppeal[]
   @@index([professionalProfileId, status])
 }
 
@@ -675,6 +712,7 @@ model ProjectMessage {
   author    User             @relation(fields: [authorId], references: [id])
   parent    ProjectMessage?  @relation("MessageThread", fields: [parentId], references: [id])
   replies   ProjectMessage[] @relation("MessageThread")
+  files     FileAsset[]
   @@index([projectId, createdAt])
 }
 
@@ -708,11 +746,17 @@ model Dispute {
   amountAffected Int?
   status         DisputeStatus @default(OPEN)
   resolution     String?
+  agreementId    String?
+  agreementVersion Int?
+  assignedReviewerId String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   milestone      Milestone?    @relation(fields: [milestoneId], references: [id])
   openedBy       User          @relation("DisputeOpener", fields: [openedById], references: [id])
+  assignedReviewer User?       @relation("DisputeReviewer", fields: [assignedReviewerId], references: [id], onDelete: SetNull)
+  notes          DisputeNote[]
+  files          FileAsset[]
   @@index([projectId, status, createdAt])
 }
 
@@ -777,6 +821,18 @@ model Campaign {
   status         CampaignStatus @default(DRAFT)
   startsAt       DateTime?
   endsAt         DateTime?
+  objective      String?
+  targetAudience String?
+  targetGeography String?
+  postingSchedule String?
+  approvalRequirements String?
+  reportingRequirements String?
+  budget         Int?
+  compensationModel String      @default("FIXED")
+  conversionRule String?
+  attributionWindowDays Int     @default(30)
+  attributionExclusions String?
+  refundTreatment String        @default("EXCLUDE_REFUNDED")
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   createdBy      User           @relation(fields: [createdById], references: [id])
@@ -827,6 +883,7 @@ model CampaignContent {
   publishedUrl       String?
   publishedAt        DateTime?
   campaignCreator    CampaignCreator      @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
+  files              FileAsset[]
   @@index([status, submittedAt])
 }
 
@@ -843,6 +900,10 @@ model CampaignAttribution {
   reviewerId        String?
   reviewerNote      String?
   bonusAmount       Int                     @default(0)
+  source            String                  @default("MANUAL")
+  eventType         String                  @default("ORDER")
+  simulated         Boolean                 @default(true)
+  refundedAt        DateTime?
   campaignCreator   CampaignCreator         @relation(fields: [campaignCreatorId], references: [id], onDelete: Cascade)
   bonusObligation   CompensationObligation?
   @@index([campaignCreatorId, status, occurredAt])
@@ -918,6 +979,7 @@ model WithdrawalRequest {
   pagaPayout  PagaPayout?
   @@index([status, reviewAfter])
   @@index([userId, status, requestedAt])
+  @@index([pagaBankDestinationId])
 }
 
 model PagaAccount {
@@ -1103,6 +1165,9 @@ model Notification {
   userId    String
   title     String
   body      String
+  category  String   @default("GENERAL")
+  href      String?
+  emailedAt DateTime?
   readAt    DateTime?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1135,4 +1200,100 @@ model RateLimitBucket {
   windowStart DateTime
   expiresAt   DateTime
   @@index([expiresAt])
+}
+
+model NotificationPreference {
+  userId    String
+  category  String
+  inApp     Boolean  @default(true)
+  email     Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@id([userId, category])
+}
+
+/// Private uploaded file. Bytes live in the configured private storage adapter,
+/// never at a public URL; downloads go through /api/files/[id] with access checks.
+model FileAsset {
+  id                String           @id @default(cuid())
+  ownerId           String
+  purpose           FileAssetPurpose
+  storageKey        String           @unique
+  originalName      String
+  contentType       String
+  sizeBytes         Int
+  sha256            String
+  projectId         String?
+  submissionId      String?
+  messageId         String?
+  disputeId         String?
+  portfolioItemId   String?
+  trustReviewId     String?
+  campaignContentId String?
+  deletedAt         DateTime?
+  createdAt         DateTime         @default(now())
+  owner             User             @relation("FileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  project           Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submission        Submission?      @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  message           ProjectMessage?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  dispute           Dispute?         @relation(fields: [disputeId], references: [id], onDelete: SetNull)
+  portfolioItem     PortfolioItem?   @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  trustReview       TrustReview?     @relation(fields: [trustReviewId], references: [id], onDelete: Cascade)
+  campaignContent   CampaignContent? @relation(fields: [campaignContentId], references: [id], onDelete: Cascade)
+  @@index([projectId, createdAt])
+  @@index([ownerId, purpose])
+}
+
+/// A buyer's proposal to settle a milestone for less than the agreed amount.
+/// Takes effect only when the assigned professional accepts it.
+model MilestoneSettlementProposal {
+  id            String                   @id @default(cuid())
+  milestoneId   String
+  proposedById  String
+  amount        Int
+  currency      String
+  reason        String
+  status        SettlementProposalStatus @default(PENDING)
+  respondedById String?
+  responseNote  String?
+  respondedAt   DateTime?
+  createdAt     DateTime                 @default(now())
+  milestone     Milestone                @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  proposedBy    User                     @relation("SettlementProposer", fields: [proposedById], references: [id])
+  respondedBy   User?                    @relation("SettlementResponder", fields: [respondedById], references: [id])
+  @@index([milestoneId, status])
+}
+
+model DisputeNote {
+  id         String   @id @default(cuid())
+  disputeId  String
+  authorId   String
+  body       String
+  /// STAFF notes are internal to Operations; PARTIES notes are visible to both project parties.
+  visibility String   @default("PARTIES")
+  createdAt  DateTime @default(now())
+  dispute    Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  author     User     @relation(fields: [authorId], references: [id])
+  @@index([disputeId, createdAt])
+}
+
+/// A user's request to correct or appeal a trust or assessment decision. Always reviewed by a person.
+model TrustAppeal {
+  id            String            @id @default(cuid())
+  userId        String
+  kind          String            @default("APPEAL")
+  trustReviewId String?
+  assessmentId  String?
+  reason        String
+  status        AppealStatus      @default(OPEN)
+  reviewerId    String?
+  staffNote     String?
+  reviewedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  user          User              @relation("AppealAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer      User?             @relation("AppealReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  trustReview   TrustReview?      @relation(fields: [trustReviewId], references: [id], onDelete: Cascade)
+  assessment    SkillsAssessment? @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }

@@ -179,8 +179,9 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
         create: { userId: user.id, ...saved },
         update: saved,
       });
-      await tx.portfolioItem.deleteMany({ where: { profileId: profile.id } });
-      if (portfolio.length) await tx.portfolioItem.createMany({ data: portfolio.filter((item): item is NonNullable<typeof item> => item !== null).map((item) => ({ ...item, profileId: profile.id })) });
+      // Portfolio items are managed individually (with private files) from the portfolio section.
+      // The legacy one-line format is only applied when a client still sends it, and only adds items.
+      if (formData.has("portfolio") && portfolio.length) await tx.portfolioItem.createMany({ data: portfolio.filter((item): item is NonNullable<typeof item> => item !== null).map((item) => ({ ...item, profileId: profile.id })) });
     });
   } else {
     const previous = await db.creatorProfile.findUnique({ where: { userId: user.id }, select: { verificationStatus: true } });

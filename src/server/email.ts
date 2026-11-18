@@ -59,3 +59,25 @@ export async function sendAccountEmail(to: string, subject: string, url: string)
 </html>`,
   });
 }
+
+/** Branded notification email. Bodies are escaped; links are always to this Kintovo deployment. */
+export async function sendNotificationEmail(to: string, title: string, body: string, href?: string | null) {
+  const host = process.env.SMTP_HOST;
+  const from = process.env.EMAIL_FROM;
+  if (!host || !from) return;
+  const base = process.env.AUTH_URL ?? "http://localhost:3000";
+  const url = href ? new URL(href.startsWith("/") ? href : "/workspace/notifications", base).toString() : new URL("/workspace/notifications", base).toString();
+  const transporter = nodemailer.createTransport({
+    host,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: Number(process.env.SMTP_PORT ?? 587) === 465,
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
+  });
+  await transporter.sendMail({
+    from,
+    to,
+    subject: `Kintovo · ${title}`,
+    text: `${title}\n\n${body}\n\nOpen Kintovo: ${url}\n\nManage email preferences in Settings and support.`,
+    html: `<!doctype html><html lang="en"><body style="margin:0;background:#f7f5f0;color:#202522;font-family:Arial,sans-serif"><div style="padding:40px 16px"><div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e0d7"><div style="padding:24px 28px;border-bottom:1px solid #e5e0d7"><div style="color:#e45a3d;font-size:16px;font-weight:700;letter-spacing:2px">KINTOVO</div></div><div style="padding:32px 28px"><h1 style="margin:0 0 12px;font-size:22px;line-height:1.3">${escapeHtml(title)}</h1><p style="margin:0 0 28px;color:#68716c;font-size:15px;line-height:1.6;white-space:pre-line">${escapeHtml(body)}</p><a href="${escapeHtml(url)}" style="display:inline-block;padding:13px 20px;border-radius:5px;color:#ffffff;background:#e45a3d;font-size:14px;font-weight:700;text-decoration:none">Open in Kintovo</a></div><div style="padding:18px 28px;border-top:1px solid #e5e0d7;color:#68716c;font-size:11px">You receive this because email is enabled for this notification type. Change it in Settings and support.</div></div></div></body></html>`,
+  });
+}

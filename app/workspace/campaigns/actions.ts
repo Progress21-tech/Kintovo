@@ -8,6 +8,23 @@ import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
 import { calculateCreatorBonus, validManualAttributionEventId } from "@/server/campaigns";
 import { platformFlag } from "@/server/settings";
+import { compensationModels, refundTreatments, validateCompensation } from "@/server/attribution";
+import { notify, scheduleNotificationEmails } from "@/server/notifications";
+
+const campaignDetails = z.object({
+  objective: z.string().trim().min(10).max(1000),
+  targetAudience: z.string().trim().max(1000).optional(),
+  targetGeography: z.string().trim().max(300).optional(),
+  postingSchedule: z.string().trim().max(1000).optional(),
+  approvalRequirements: z.string().trim().max(1000).optional(),
+  reportingRequirements: z.string().trim().max(1000).optional(),
+  budget: z.string().optional(),
+  compensationModel: z.enum(compensationModels),
+  conversionRule: z.string().trim().max(1000).optional(),
+  attributionWindowDays: z.coerce.number().int().min(1).max(90),
+  attributionExclusions: z.string().trim().max(1000).optional(),
+  refundTreatment: z.enum(refundTreatments),
+});
 import { transferApprovedMilestoneCompensation } from "@/server/paga-compensation";
 
 const currencies = ["NGN", "USD", "GBP", "EUR"] as const;
@@ -28,11 +45,17 @@ export async function createCampaign(formData: FormData) {
   if (!await platformFlag("CAMPAIGNS_ENABLED")) return;
   const input = z.object({ title: z.string().trim().min(4).max(140), brief: z.string().trim().min(30).max(4000), organisationId: z.string().min(1), platforms: z.string().max(500), contentTypes: z.string().max(500), usageRights: z.string().trim().max(2000).optional(), landingUrl: z.union([z.literal(""), z.url()]).optional(), startsAt: z.string().optional(), endsAt: z.string().optional(), currency: z.enum(currencies), fixedFee: z.string(), bonusRate: z.string(), bonusCap: z.string().optional(), bonusTerms: z.string().trim().max(1000).optional() }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return;
+  const details = campaignDetails.safeParse(Object.fromEntries(formData.entries()));
+  if (!details.success) redirect(`/workspace/campaigns?error=${encodeURIComponent(details.error.issues[0]?.message ? `${details.error.issues[0].path.join(".")}: ${details.error.issues[0].message}` : "Check the campaign details.")}`);
+  const budget = details.data.budget?.trim() ? integer(details.data.budget) : null;
+  if (budget !== null && !Number.isSafeInteger(budget)) return;
   const startsAt = input.data.startsAt ? new Date(`${input.data.startsAt}T12:00:00.000Z`) : null;
   const endsAt = input.data.endsAt ? new Date(`${input.data.endsAt}T12:00:00.000Z`) : null;
   if ((startsAt && Number.isNaN(startsAt.getTime())) || (endsAt && Number.isNaN(endsAt.getTime())) || (startsAt && endsAt && endsAt < startsAt)) return;
   const fixedFee = integer(formData.get("fixedFee")); const bonusRate = integer(formData.get("bonusRate")); const bonusCap = input.data.bonusCap?.trim() ? integer(input.data.bonusCap) : null;
   if (!Number.isSafeInteger(fixedFee) || !Number.isSafeInteger(bonusRate) || bonusRate > 10000 || (bonusCap !== null && !Number.isSafeInteger(bonusCap))) return;
+  const compensationError = validateCompensation(details.data.compensationModel, fixedFee, bonusRate);
+  if (compensationError) redirect(`/workspace/campaigns?error=${encodeURIComponent(compensationError)}`);
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: input.data.organisationId, userId: user.id } } });
   if (!membership || !canManageProjects(membership.role)) return;
   const organisationId = membership.organisationId;
@@ -40,10 +63,14 @@ export async function createCampaign(formData: FormData) {
   const eligible = creatorIds.length ? await db.creatorProfile.findMany({ where: { id: { in: creatorIds }, isPublished: true, trustReviews: { some: { dimension: "PORTFOLIO_SKILLS", status: "APPROVED" } } }, select: { id: true, userId: true } }) : [];
   if (eligible.length !== creatorIds.length) return;
   const campaign = await db.$transaction(async (tx) => {
-    const created = await tx.campaign.create({ data: { title: input.data.title, brief: input.data.brief, createdById: user.id, organisationId, platforms: lines(input.data.platforms), contentTypes: lines(input.data.contentTypes), usageRights: input.data.usageRights || null, landingUrl: input.data.landingUrl || null, startsAt, endsAt, currency: input.data.currency, status: creatorIds.length ? "INVITING" : "DRAFT" } });
+    const created = await tx.campaign.create({ data: { title: input.data.title, brief: input.data.brief, createdById: user.id, organisationId, platforms: lines(input.data.platforms), contentTypes: lines(input.data.contentTypes), usageRights: input.data.usageRights || null, landingUrl: input.data.landingUrl || null, startsAt, endsAt, currency: input.data.currency, status: creatorIds.length ? "INVITING" : "DRAFT",
+      objective: details.data.objective, targetAudience: details.data.targetAudience || null, targetGeography: details.data.targetGeography || null,
+      postingSchedule: details.data.postingSchedule || null, approvalRequirements: details.data.approvalRequirements || null, reportingRequirements: details.data.reportingRequirements || null,
+      budget, compensationModel: details.data.compensationModel, conversionRule: details.data.conversionRule || null, attributionWindowDays: details.data.attributionWindowDays,
+      attributionExclusions: details.data.attributionExclusions || null, refundTreatment: details.data.refundTreatment } });
     for (const creator of eligible) {
-      await tx.campaignCreator.create({ data: { campaignId: created.id, creatorId: creator.id, fixedFee, bonusRate, bonusCap, bonusTerms: input.data.bonusTerms || null, contractTerms: `Campaign: ${created.title}\nUsage rights: ${input.data.usageRights || "As agreed in this campaign brief"}\nFixed compensation: ${input.data.currency} ${fixedFee}\nPerformance bonus: ${bonusRate} basis points${bonusCap === null ? " (no stated cap)" : `, capped at ${input.data.currency} ${bonusCap}`}\n${input.data.bonusTerms || ""}` } });
-      await tx.notification.create({ data: { userId: creator.userId, title: "Creator campaign invitation", body: `You have been invited to review “${created.title}”. Review its terms before accepting.` } });
+      await tx.campaignCreator.create({ data: { campaignId: created.id, creatorId: creator.id, fixedFee, bonusRate, bonusCap, bonusTerms: input.data.bonusTerms || null, contractTerms: `Campaign: ${created.title}\nArrangement: ${details.data.compensationModel.replace("_", " ").toLowerCase()}\nAttribution: last tracked click within ${details.data.attributionWindowDays} days; clicks alone are never conversions\nRefunded or cancelled orders: ${details.data.refundTreatment === "INCLUDE_REFUNDED" ? "still count" : "do not count"}${details.data.conversionRule ? `\nEligible conversion: ${details.data.conversionRule}` : ""}${details.data.attributionExclusions ? `\nExclusions: ${details.data.attributionExclusions}` : ""}\nUsage rights: ${input.data.usageRights || "As agreed in this campaign brief"}\nFixed compensation: ${input.data.currency} ${fixedFee}\nPerformance bonus: ${bonusRate} basis points${bonusCap === null ? " (no stated cap)" : `, capped at ${input.data.currency} ${bonusCap}`}\n${input.data.bonusTerms || ""}` } });
+      await tx.notification.create({ data: { category: "CAMPAIGN", userId: creator.userId, title: "Creator campaign invitation", body: `You have been invited to review “${created.title}”. Review its terms before accepting.` } });
     }
     await tx.auditLog.create({ data: { actorId: user.id, action: "CAMPAIGN_CREATED", entityType: "Campaign", entityId: created.id, metadata: { invitedCreators: eligible.length } } });
     return created;
@@ -69,8 +96,8 @@ export async function inviteCampaignCreators(formData: FormData) {
   if (!eligible.length || eligible.length !== creatorIds.filter((id) => !existing.some((item) => item.creatorId === id)).length) return;
   await db.$transaction(async (tx) => {
     for (const creator of eligible) {
-      await tx.campaignCreator.create({ data: { campaignId: campaign.id, creatorId: creator.id, fixedFee, bonusRate, bonusCap, bonusTerms: input.data.bonusTerms || null, contractTerms: `Campaign: ${campaign.title}\nUsage rights: ${campaign.usageRights || "As agreed in this campaign brief"}\nFixed compensation: ${campaign.currency} ${fixedFee}\nPerformance bonus: ${bonusRate} basis points${bonusCap === null ? " (no stated cap)" : `, capped at ${campaign.currency} ${bonusCap}`}\n${input.data.bonusTerms || ""}` } });
-      await tx.notification.create({ data: { userId: creator.userId, title: "Creator campaign invitation", body: `You have been invited to review “${campaign.title}”. Review its terms before accepting.` } });
+      await tx.campaignCreator.create({ data: { campaignId: campaign.id, creatorId: creator.id, fixedFee, bonusRate, bonusCap, bonusTerms: input.data.bonusTerms || null, contractTerms: `Campaign: ${campaign.title}\nArrangement: ${campaign.compensationModel.replace("_", " ").toLowerCase()}\nAttribution: last tracked click within ${campaign.attributionWindowDays} days; clicks alone are never conversions\nRefunded or cancelled orders: ${campaign.refundTreatment === "INCLUDE_REFUNDED" ? "still count" : "do not count"}\nUsage rights: ${campaign.usageRights || "As agreed in this campaign brief"}\nFixed compensation: ${campaign.currency} ${fixedFee}\nPerformance bonus: ${bonusRate} basis points${bonusCap === null ? " (no stated cap)" : `, capped at ${campaign.currency} ${bonusCap}`}\n${input.data.bonusTerms || ""}` } });
+      await tx.notification.create({ data: { category: "CAMPAIGN", userId: creator.userId, title: "Creator campaign invitation", body: `You have been invited to review “${campaign.title}”. Review its terms before accepting.` } });
     }
     await tx.campaign.update({ where: { id: campaign.id }, data: { status: campaign.status === "DRAFT" ? "INVITING" : campaign.status } });
     await tx.auditLog.create({ data: { actorId: user.id, action: "CAMPAIGN_CREATORS_INVITED", entityType: "Campaign", entityId: campaign.id, metadata: { count: eligible.length } } });
@@ -123,7 +150,7 @@ export async function submitCampaignContent(formData: FormData) {
   if (!invitation || invitation.creator.userId !== user.id || !["ACCEPTED", "ACTIVE"].includes(invitation.status) || invitation.campaign.status !== "ACTIVE") return;
   const content = await db.campaignContent.create({ data: { campaignCreatorId: invitation.id, title: input.data.title, submissionUrl: input.data.submissionUrl || null, note: input.data.note } });
   await db.$transaction([
-    db.notification.create({ data: { userId: invitation.campaign.createdById, title: "Campaign content submitted", body: `A creator submitted “${content.title}” for review.` } }),
+    db.notification.create({ data: { category: "CAMPAIGN", userId: invitation.campaign.createdById, title: "Campaign content submitted", body: `A creator submitted “${content.title}” for review.` } }),
     db.auditLog.create({ data: { actorId: user.id, action: "CAMPAIGN_CONTENT_SUBMITTED", entityType: "CampaignContent", entityId: content.id } }),
   ]);
   revalidatePath("/workspace/campaigns");
@@ -137,7 +164,7 @@ export async function reviewCampaignContent(formData: FormData) {
   if (!content || !(await campaignManager(content.campaignCreator.campaignId, user.id)) || !["SUBMITTED", "REVISION_REQUESTED"].includes(content.status)) return;
   await db.$transaction(async (tx) => {
     await tx.campaignContent.update({ where: { id: content.id }, data: { status: input.data.decision, reviewerId: user.id, reviewerNote: input.data.reviewerNote, reviewedAt: new Date() } });
-    await tx.notification.create({ data: { userId: content.campaignCreator.creator.userId, title: `Campaign content ${input.data.decision.toLowerCase().replaceAll("_", " ")}`, body: input.data.reviewerNote } });
+    await tx.notification.create({ data: { category: "CAMPAIGN", userId: content.campaignCreator.creator.userId, title: `Campaign content ${input.data.decision.toLowerCase().replaceAll("_", " ")}`, body: input.data.reviewerNote } });
     await tx.auditLog.create({ data: { actorId: user.id, action: `CAMPAIGN_CONTENT_${input.data.decision}`, entityType: "CampaignContent", entityId: content.id } });
   });
   revalidatePath("/workspace/campaigns");

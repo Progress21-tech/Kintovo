@@ -45,7 +45,7 @@ export default async function FundingPage() {
         {account?.status === "ACTIVE" && account.accountNumber ? <>
           <p><strong>Bank account number:</strong> <code>{account.accountNumber}</code></p>
           <p><strong>Account name:</strong> {membership.organisation.name}</p>
-          <p>Send NGN to this account. Deposits are credited only after Paga's signed funding notification is verified and recorded.</p>
+          <p>Send NGN to this account. Deposits are credited only after Paga&apos;s signed funding notification is verified and recorded.</p>
         </> : <>
           <p>{sandboxEnabled ? "Paga account provisioning is not complete yet." : "Paga Sandbox has not been enabled for this deployment. The account record is reserved and no provider request has been made."}</p>
           {account?.provisioningError && <p className="field-note">Setup detail: {account.provisioningError}</p>}
@@ -60,13 +60,13 @@ export default async function FundingPage() {
     </section>
     <section className="panel">
       <div className="panel-header"><div><h2>Currency and settlement</h2><span className="field-note">This account is a real NGN subsidiary account, not a multi-currency wallet.</span></div></div>
-      <div className="panel-content"><p>USD collection uses Paga's separate USD bank-transfer payment request flow and settles as NGN at Paga's exchange rate when the payment arrives. EUR and GBP collection are not enabled through this Paga integration. They must stay unavailable until a separate, approved provider flow is selected.</p></div>
+      <div className="panel-content"><p>USD collection uses Paga&apos;s separate USD bank-transfer payment request flow and settles as NGN at Paga&apos;s exchange rate when the payment arrives. EUR and GBP collection are not enabled through this Paga integration. They must stay unavailable until a separate, approved provider flow is selected.</p></div>
     </section>
     <section className="panel earnings-withdrawal">
       <div className="panel-header"><div><h2>Fund from a USD bank account</h2><span className="field-note">Paga creates single-use ACH, US wire, and SWIFT instructions. Each rail has its own USD amount and fee.</span></div><span className="status-pill">USD to NGN</span></div>
       <div className="panel-content">
-        {account?.status === "ACTIVE" ? <UsdFundingForm /> : <p className="field-note">The organisation's Paga account must be active before USD funding requests can be created.</p>}
-        <p className="legal-note">Paga's USD callback does not document a signature header. Kintovo verifies the payment reference through Paga's authenticated status API and credits only the NGN amount requested when the instruction was created. FX and overpayment differences require reconciliation.</p>
+        {account?.status === "ACTIVE" ? <UsdFundingForm /> : <p className="field-note">The organisation&apos;s Paga account must be active before USD funding requests can be created.</p>}
+        <p className="legal-note">Paga&apos;s USD callback does not document a signature header. Kintovo verifies the payment reference through Paga&apos;s authenticated status API and credits only the NGN amount requested when the instruction was created. FX and overpayment differences require reconciliation.</p>
       </div>
     </section>
     {usdCollections.length > 0 && <section className="earnings-list"><h2 className="section-subhead">Recent USD funding requests</h2>{usdCollections.map((item) => {
