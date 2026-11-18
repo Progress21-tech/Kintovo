@@ -223,9 +223,9 @@ export async function reimburseReversedPagaWithdrawal(payoutId: string, reviewer
   if (!reversalId) throw new Error("The Paga reversal reference is missing; do not release this withdrawal.");
 
   const reference = payout.reimbursementReference ?? newReference("KNTCHG");
-  const payoutId = payout.id;
+  const payoutRecordId = payout.id;
   payout = await db.$transaction(async (tx) => {
-    const fresh = await tx.pagaPayout.findUnique({ where: { id: payoutId } });
+    const fresh = await tx.pagaPayout.findUnique({ where: { id: payoutRecordId } });
     if (!fresh || fresh.reimbursedAt) throw new Error("This withdrawal has already been reimbursed.");
     const changed = await tx.withdrawalRequest.updateMany({ where: { id: fresh.withdrawalRequestId, status: "PROCESSING" }, data: { reviewNote: `Paga reversal ${reversalId} confirmed. Reimbursement is pending. ${note}`.slice(0, 1000) } });
     if (changed.count !== 1) throw new Error("This withdrawal is no longer processing.");
