@@ -26,7 +26,7 @@ export function PagaBankDestinationForm({ active }: { active: boolean }) {
     setLoadError("");
     startTransition(async () => {
       const result = await getPagaBankOptions();
-      if ("error" in result) setLoadError(result.error);
+      if ("error" in result) setLoadError(result.error ?? "Paga bank list could not be loaded.");
       else setBanks(result.banks);
     });
   }

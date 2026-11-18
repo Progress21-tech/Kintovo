@@ -79,6 +79,7 @@ export async function savePagaBankDestination(_state: { error?: string; success?
     const banks = Array.isArray(banksResult.banks) ? banksResult.banks : [];
     const selected = banks.find((item) => item && typeof item === "object" && !Array.isArray(item) && (item as Record<string, unknown>).uuid === parsed.data.bankPublicId) as Record<string, unknown> | undefined;
     if (String(banksResult.responseCode) !== "0" || typeof selected?.name !== "string") return { error: "Select a bank from Paga's current bank list." };
+    const bankName = selected.name;
 
     const validation = await validatePagaBankAccount({
       referenceNumber: `KNTVAL${randomBytes(12).toString("hex")}`,
@@ -86,9 +87,11 @@ export async function savePagaBankDestination(_state: { error?: string; success?
       bankPublicId: parsed.data.bankPublicId,
       accountNumber: parsed.data.accountNumber,
     });
-    if (Number(validation.responseCode) !== 0 || typeof validation.destinationAccountHolderNameAtBank !== "string" || !validation.destinationAccountHolderNameAtBank.trim()) {
+    const accountHolderName = validation.destinationAccountHolderNameAtBank;
+    if (Number(validation.responseCode) !== 0 || typeof accountHolderName !== "string" || !accountHolderName.trim()) {
       return { error: typeof validation.message === "string" ? validation.message : "Paga could not validate that bank account." };
     }
+    const normalizedAccountHolderName = accountHolderName.trim();
 
     const encrypted = encryptPagaBankAccountNumber(parsed.data.accountNumber);
     const last4 = parsed.data.accountNumber.slice(-4);
@@ -96,14 +99,14 @@ export async function savePagaBankDestination(_state: { error?: string; success?
       await tx.pagaBankDestination.updateMany({ where: { userId: user.id, isDefault: true }, data: { isDefault: false } });
       const reusable = await tx.pagaBankDestination.findFirst({ where: { userId: user.id, bankPublicId: parsed.data.bankPublicId, accountNumberLast4: last4, payouts: { none: {} } } });
       if (reusable) {
-        await tx.pagaBankDestination.update({ where: { id: reusable.id }, data: { bankName: selected.name as string, accountNumberCipher: encrypted, accountHolderName: validation.destinationAccountHolderNameAtBank.trim(), validatedAt: new Date(), isDefault: true } });
+        await tx.pagaBankDestination.update({ where: { id: reusable.id }, data: { bankName, accountNumberCipher: encrypted, accountHolderName: normalizedAccountHolderName, validatedAt: new Date(), isDefault: true } });
       } else {
-        await tx.pagaBankDestination.create({ data: { userId: user.id, bankPublicId: parsed.data.bankPublicId, bankName: selected.name as string, accountNumberCipher: encrypted, accountNumberLast4: last4, accountHolderName: validation.destinationAccountHolderNameAtBank.trim(), validatedAt: new Date(), isDefault: true } });
+        await tx.pagaBankDestination.create({ data: { userId: user.id, bankPublicId: parsed.data.bankPublicId, bankName, accountNumberCipher: encrypted, accountNumberLast4: last4, accountHolderName: normalizedAccountHolderName, validatedAt: new Date(), isDefault: true } });
       }
-      await tx.auditLog.create({ data: { actorId: user.id, action: "PAGA_BANK_DESTINATION_VALIDATED", entityType: "User", entityId: user.id, metadata: { bankName: selected.name, accountNumberLast4: last4 } } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "PAGA_BANK_DESTINATION_VALIDATED", entityType: "User", entityId: user.id, metadata: { bankName, accountNumberLast4: last4 } } });
     });
     revalidatePath("/workspace/earnings");
-    return { success: `Paga validated and linked the bank account for ${validation.destinationAccountHolderNameAtBank.trim()}.` };
+    return { success: `Paga validated and linked the bank account for ${normalizedAccountHolderName}.` };
   } catch (error) {
     console.error("Paga bank destination validation failed", { userId: user.id, error });
     return { error: error instanceof Error && error.message.includes("PAGA_BANK_ENCRYPTION_KEY") ? error.message : "Could not validate or save the bank account. Check Paga Sandbox setup and try again." };
