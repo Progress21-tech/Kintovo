@@ -29,7 +29,7 @@ export function SignInForm({ googleConfigured = false }: { googleConfigured?: bo
   }
   return <form action={submit} className="form-stack">
     <label>Email address<input type="email" name="email" autoComplete="email" required /></label>
-    <label>Password<div className="password-label-row"><span>Password</span><Link href="/forgot-password">Forgot password?</Link></div><input type="password" name="password" autoComplete="current-password" required /></label>
+    <div className="password-field"><div className="password-label-row"><label htmlFor="sign-in-password">Password</label><Link href="/forgot-password">Forgot password?</Link></div><input id="sign-in-password" type="password" name="password" autoComplete="current-password" required /></div>
     {error && <p className="form-alert" role="alert">{error}</p>}
     <button className="button button-primary button-wide" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
     {googleConfigured && <><div className="auth-divider"><span>or</span></div>

@@ -2,14 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   ArrowRight,
-  BriefcaseBusiness,
-  CheckCircle2,
-  CircleDollarSign,
-  Clock3,
+  Briefcase,
+  CheckCircle,
+  Wallet,
+  Clock,
   FileText,
-  UserRound,
-  UsersRound,
-} from "lucide-react";
+  User,
+  UsersThree,
+} from "@phosphor-icons/react/dist/ssr";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
@@ -59,19 +59,19 @@ export default async function WorkspacePage() {
 
     <section className="account-context-grid" aria-label="Your Kintovo workspaces">
       {hasBusiness && <Link className="account-context-card" href="/workspace/organisations">
-        <span className="context-card-icon"><BriefcaseBusiness size={17} aria-hidden="true" /> Business</span>
+        <span className="context-card-icon"><Briefcase size={17} aria-hidden="true" /> Business</span>
         <strong>{memberships.length ? `${memberships.length} organisation${memberships.length === 1 ? "" : "s"}` : "Set up an organisation"}</strong>
         <small>Briefs, projects, and team access</small>
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
       </Link>}
       {hasProfessional && <Link className="account-context-card" href="/workspace/professional">
-        <span className="context-card-icon"><UserRound size={17} aria-hidden="true" /> Specialist</span>
+        <span className="context-card-icon"><User size={17} aria-hidden="true" /> Specialist</span>
         <strong>{specialist?.onboardingCompletedAt ? specialist.verificationStatus.replaceAll("_", " ") : "Continue profile"}</strong>
         <small>Skills, experience, availability, and work</small>
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
       </Link>}
       {hasCreator && <Link className="account-context-card" href="/workspace/campaigns">
-        <span className="context-card-icon"><UsersRound size={17} aria-hidden="true" /> Creator</span>
+        <span className="context-card-icon"><UsersThree size={17} aria-hidden="true" /> Creator</span>
         <strong>{creator?.onboardingCompletedAt ? creator.verificationStatus.replaceAll("_", " ") : "Continue profile"}</strong>
         <small>Content, channels, and optional audience evidence</small>
         <ArrowRight className="context-arrow" size={16} aria-hidden="true" />
@@ -80,7 +80,7 @@ export default async function WorkspacePage() {
 
     {!hasBusiness && !hasProfessional && !hasCreator && <section className="panel empty-state dashboard-empty">
       <div>
-        <span className="empty-icon"><BriefcaseBusiness size={18} aria-hidden="true" /></span>
+        <span className="empty-icon"><Briefcase size={18} aria-hidden="true" /></span>
         <p className="dashboard-empty-kicker">Set up your workspace</p>
         <h2>Start with a business workspace</h2>
         <p>Create an organisation to define your goals, plan workstreams, and assemble a project team.</p>
@@ -90,7 +90,7 @@ export default async function WorkspacePage() {
 
     {!hasBusiness && (hasProfessional || hasCreator) && <section className="panel empty-state dashboard-empty">
       <div>
-        <span className="empty-icon"><BriefcaseBusiness size={18} aria-hidden="true" /></span>
+        <span className="empty-icon"><Briefcase size={18} aria-hidden="true" /></span>
         <p className="dashboard-empty-kicker">Your next step</p>
         <h2>{hasCreator && !hasProfessional ? "Build your creator presence" : "Build your professional presence"}</h2>
         <p>{hasCreator && !hasProfessional ? "Complete your creator profile to receive campaign invitations and keep your content work ready for review." : "Your account is ready. Finish a private profile and submit it when you are ready for human review."}</p>
@@ -122,8 +122,8 @@ export default async function WorkspacePage() {
         <div className="dashboard-section-heading"><div><span className="welcome-label">At a glance</span><h2>Project briefs</h2></div><span className="dashboard-updated">Across your organisations</span></div>
         <div className="metric-grid">
           <article className="metric metric-draft"><span><FileText size={16} aria-hidden="true" /> Draft briefs</span><strong>{draftCount}</strong><small>Ready to keep working on</small></article>
-          <article className="metric metric-review"><span><Clock3 size={16} aria-hidden="true" /> For review</span><strong>{reviewCount}</strong><small>Submitted or under review</small></article>
-          <article className="metric metric-active"><span><CheckCircle2 size={16} aria-hidden="true" /> Active work</span><strong>{activeCount}</strong><small>Matching or in progress</small></article>
+          <article className="metric metric-review"><span><Clock size={16} aria-hidden="true" /> For review</span><strong>{reviewCount}</strong><small>Submitted or under review</small></article>
+          <article className="metric metric-active"><span><CheckCircle size={16} aria-hidden="true" /> Active work</span><strong>{activeCount}</strong><small>Matching or in progress</small></article>
         </div>
       </section>
 
@@ -131,19 +131,19 @@ export default async function WorkspacePage() {
         <section className="panel dashboard-projects">
           <div className="panel-header"><div><span className="welcome-label">Your work</span><h2>Recent project briefs</h2></div><Link className="text-link dashboard-view-all" href="/workspace/projects">View all <ArrowRight size={15} aria-hidden="true" /></Link></div>
           {projects.length ? <div className="panel-content project-list">{projects.map((project) => <Link className="project-row" key={project.id} href={`/workspace/projects/${project.id}`}>
-            <span className="project-row-icon"><BriefcaseBusiness size={17} aria-hidden="true" /></span>
+            <span className="project-row-icon"><Briefcase size={17} aria-hidden="true" /></span>
             <span className="project-row-main"><strong>{project.title}</strong><small>{project.brief?.targetMarket ?? "Nigeria"} <span aria-hidden="true">·</span> Updated {project.updatedAt.toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</small></span>
             <span className="project-path">{project.path === "TEAM" ? "Team assembly" : project.path === "INDIVIDUAL" ? "Individual" : "Plan first"}</span>
             <span className={`status-pill ${statusClass[project.status] ?? ""}`}>{project.status.replaceAll("_", " ")}</span>
-          </Link>)}</div> : <div className="empty-state"><div><span className="empty-icon"><BriefcaseBusiness size={17} aria-hidden="true" /></span><h3>Your first project starts with a goal</h3><p>Share the outcome you want to reach. Kintovo will suggest the capabilities that may help.</p><Link className="button button-primary" href="/workspace/projects/new">Create a project brief</Link></div></div>}
+          </Link>)}</div> : <div className="empty-state"><div><span className="empty-icon"><Briefcase size={17} aria-hidden="true" /></span><h3>Your first project starts with a goal</h3><p>Share the outcome you want to reach. Kintovo will suggest the capabilities that may help.</p><Link className="button button-primary" href="/workspace/projects/new">Create a project brief</Link></div></div>}
         </section>
 
         <section className="panel dashboard-next-steps">
           <div className="panel-header"><div><span className="welcome-label">A useful reminder</span><h2>Plan with clarity</h2></div></div>
           <div className="panel-content action-list">
-            <div className="action-item"><span className="action-item-icon action-coral"><BriefcaseBusiness size={16} aria-hidden="true" /></span><div><strong>Start with the outcome</strong><span>Describe what success looks like before selecting roles.</span></div></div>
-            <div className="action-item"><span className="action-item-icon action-teal"><UsersRound size={16} aria-hidden="true" /></span><div><strong>Shape the work together</strong><span>Review and edit suggested workstreams before moving ahead.</span></div></div>
-            <div className="action-item"><span className="action-item-icon action-amber"><CircleDollarSign size={16} aria-hidden="true" /></span><div><strong>Keep terms transparent</strong><span>Agreements record scope, fees, and review expectations.</span></div></div>
+            <div className="action-item"><span className="action-item-icon action-coral"><Briefcase size={16} aria-hidden="true" /></span><div><strong>Start with the outcome</strong><span>Describe what success looks like before selecting roles.</span></div></div>
+            <div className="action-item"><span className="action-item-icon action-teal"><UsersThree size={16} aria-hidden="true" /></span><div><strong>Shape the work together</strong><span>Review and edit suggested workstreams before moving ahead.</span></div></div>
+            <div className="action-item"><span className="action-item-icon action-amber"><Wallet size={16} aria-hidden="true" /></span><div><strong>Keep terms transparent</strong><span>Agreements record scope, fees, and review expectations.</span></div></div>
           </div>
           <Link className="dashboard-tip-link" href="/workspace/projects/new">Create a project brief <ArrowRight size={15} aria-hidden="true" /></Link>
         </section>

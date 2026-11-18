@@ -1,4 +1,4 @@
-import { Paperclip } from "lucide-react";
+import { Paperclip } from "@phosphor-icons/react/dist/ssr";
 
 export type FileChip = { id: string; originalName: string; sizeBytes: number };
 

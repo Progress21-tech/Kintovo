@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, LoaderCircle, MessageCircle, Send } from "lucide-react";
+import { Robot, CircleNotch, ChatCircle, PaperPlaneRight } from "@phosphor-icons/react";
 import { brainstormScopePlan } from "@/app/workspace/actions";
 import type { ScopeChatMessage } from "@/server/scope-service";
 import type { ScopePlan } from "@/server/scoping";
@@ -70,10 +70,10 @@ export function ScopeBrainstorm({ formRef, conversation, onConversationChange, p
 
   return <section className="scope-brainstorm" aria-label="AI scope brainstorming">
     <div className="scope-brainstorm-heading">
-      <span className="scope-brainstorm-icon"><Bot size={17} aria-hidden="true" /></span>
+      <span className="scope-brainstorm-icon"><Robot size={17} aria-hidden="true" /></span>
       <div><strong>Brainstorm the workstreams</strong><small>Talk through the goal and refine a plan with AI.</small></div>
       <button type="button" className="button button-secondary button-small" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-        <MessageCircle size={14} aria-hidden="true" />{open ? "Close" : conversation.length ? "Continue" : "Start brainstorming"}
+        <ChatCircle size={14} aria-hidden="true" />{open ? "Close" : conversation.length ? "Continue" : "Start brainstorming"}
       </button>
     </div>
     {open && <div className="scope-brainstorm-body">
@@ -87,7 +87,7 @@ export function ScopeBrainstorm({ formRef, conversation, onConversationChange, p
         {plan.questions.length > 0 && <p className="field-note">To clarify: {plan.questions.join(" · ")}</p>}
       </div>}
       <label className="scope-chat-input-label" htmlFor="scope-brainstorm-input">Your message</label>
-      <div className="scope-chat-composer"><textarea id="scope-brainstorm-input" value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} maxLength={1200} placeholder="For example: We already have a designer. What other roles would help us reach this audience?" /><button type="button" className="button button-primary" onClick={() => void sendMessage()} disabled={pending || message.trim().length < 2}>{pending ? <LoaderCircle className="scope-spinner" size={16} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}{pending ? "Thinking…" : "Send"}</button></div>
+      <div className="scope-chat-composer"><textarea id="scope-brainstorm-input" value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} maxLength={1200} placeholder="For example: We already have a designer. What other roles would help us reach this audience?" /><button type="button" className="button button-primary" onClick={() => void sendMessage()} disabled={pending || message.trim().length < 2}>{pending ? <CircleNotch className="scope-spinner" size={16} aria-hidden="true" /> : <PaperPlaneRight size={15} aria-hidden="true" />}{pending ? "Thinking…" : "Send"}</button></div>
       {error && <p className="form-alert" role="alert">{error}</p>}
       {conversation.length > 0 && <p className="scope-chat-privacy">Your goal and messages are sent to the configured AI provider only because you enabled AI for this brief. Do not share confidential personal or business information.</p>}
     </div>}

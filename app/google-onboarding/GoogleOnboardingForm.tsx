@@ -2,16 +2,16 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, Clapperboard, UserRound } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Briefcase, FilmSlate, User } from "@phosphor-icons/react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { completeGoogleOnboarding } from "./actions";
 
 type AccountContext = "BUSINESS" | "SPECIALIST" | "CREATOR";
 
-const accountTypes: { value: AccountContext; title: string; description: string; Icon: LucideIcon }[] = [
-  { value: "BUSINESS", title: "Business", description: "Create an organisation and start planning work.", Icon: BriefcaseBusiness },
-  { value: "SPECIALIST", title: "Specialist", description: "Build a professional profile and find project work.", Icon: UserRound },
-  { value: "CREATOR", title: "Creator", description: "Share your channels and the content you create.", Icon: Clapperboard },
+const accountTypes: { value: AccountContext; title: string; description: string; Icon: PhosphorIcon }[] = [
+  { value: "BUSINESS", title: "Business", description: "Create an organisation and start planning work.", Icon: Briefcase },
+  { value: "SPECIALIST", title: "Specialist", description: "Build a professional profile and find project work.", Icon: User },
+  { value: "CREATOR", title: "Creator", description: "Share your channels and the content you create.", Icon: FilmSlate },
 ];
 
 export function GoogleOnboardingForm() {

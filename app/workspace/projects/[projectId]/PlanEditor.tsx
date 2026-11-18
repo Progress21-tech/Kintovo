@@ -25,6 +25,18 @@ export function PlanEditor({ projectId, streams: initialStreams, editable = true
       [field]: field === "capabilities" || field === "recommendedRoles" ? splitList(value) : field === "deliverables" || field === "dependencies" || field === "assumptions" ? splitLines(value) : value,
     } as EditableStream : stream));
   }
+  if (!editable) return <div className="panel-content">
+    {streams.length ? <div className="workstream-list">{streams.map((stream, index) => <article className="workstream workstream-readonly" key={stream.id ?? index}>
+      <span className="mini-label">Workstream {index + 1}</span>
+      <h3>{stream.name}</h3>
+      <p>{stream.description}</p>
+      {stream.recommendedRoles.length > 0 && <div className="talent-tags">{stream.recommendedRoles.map((role) => <span className="chip" key={role}>{role}</span>)}</div>}
+      {stream.deliverables.length > 0 && <><span className="mini-label">Deliverables</span><ul>{stream.deliverables.map((item) => <li key={item}>{item}</li>)}</ul></>}
+      {stream.dependencies.length > 0 && <p className="field-note">Depends on: {stream.dependencies.join("; ")}</p>}
+      {stream.rationale && <p className="field-note">Why suggested: {stream.rationale}</p>}
+    </article>)}</div> : <p className="field-note">No workstreams were recorded for this brief.</p>}
+    <p className="field-note" style={{ marginTop: 12 }}>The scope is locked after submission. Ask Kintovo operations to reopen the brief if it needs corrections.</p>
+  </div>;
   return <form action={action} className="panel-content">
     <input type="hidden" name="projectId" value={projectId} />
     <input type="hidden" name="plan" value={JSON.stringify(planPayload)} />
