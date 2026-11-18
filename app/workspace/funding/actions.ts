@@ -28,6 +28,16 @@ export async function createUsdFundingRequest(_state: { error?: string; success?
     const account = await ensurePagaOrganisationAccount(membership.organisation.id);
     if (account.status !== "ACTIVE" || !account.accountNumber) return { error: "The organisation's Paga Sandbox account is not active yet. Complete Paga account setup first." };
 
+    const unresolvedRequest = await db.pagaUsdCollection.findFirst({
+      where: {
+        accountId: account.id,
+        status: "REQUESTED",
+        failureReason: { startsWith: "Provider request outcome unknown:" },
+      },
+      select: { referenceNumber: true },
+    });
+    if (unresolvedRequest) return { error: `Paga did not confirm request ${unresolvedRequest.referenceNumber}. Check that reference's Paga status before creating another request.` };
+
     const callbackUrl = process.env.PAGA_USD_COLLECTION_CALLBACK_URL?.trim();
     if (!callbackUrl || !callbackUrl.startsWith("https://")) return { error: "Set PAGA_USD_COLLECTION_CALLBACK_URL to the public HTTPS URL ending in /api/webhooks/paga/usd." };
     const referenceNumber = `KNTUSD${randomBytes(16).toString("hex")}`;
@@ -54,13 +64,24 @@ export async function createUsdFundingRequest(_state: { error?: string; success?
       });
       if (String(response.statusCode) !== "0") {
         const reason = typeof response.statusMessage === "string" ? response.statusMessage.slice(0, 300) : "Paga did not accept the funding request.";
-        await db.pagaUsdCollection.update({ where: { id: payment.id }, data: { status: "FAILED", failureReason: reason, responseData: JSON.parse(JSON.stringify(response)) } });
-        return { error: "Paga could not create the USD funding instructions. Review the payment request and try again." };
+        const definitiveFailure = ["-2", "-3", "114", "115", "121"].includes(String(response.statusCode));
+        await db.pagaUsdCollection.update({
+          where: { id: payment.id },
+          data: {
+            status: definitiveFailure ? "FAILED" : "REQUESTED",
+            failureReason: definitiveFailure ? reason : `Provider request outcome unknown: ${reason} Check this reference with Paga before creating another request.`,
+            responseData: JSON.parse(JSON.stringify(response)),
+          },
+        });
+        return { error: definitiveFailure
+          ? "Paga rejected the USD funding request. You can create a new request after reviewing its status."
+          : `Paga returned an unresolved response for ${referenceNumber}. Check this reference's status before creating another request.` };
       }
       await db.pagaUsdCollection.update({ where: { id: payment.id }, data: { responseData: JSON.parse(JSON.stringify(response)) } });
-    } catch {
-      await db.pagaUsdCollection.update({ where: { id: payment.id }, data: { status: "FAILED", failureReason: "Paga request failed before instructions were confirmed." } });
-      return { error: "Paga Sandbox did not confirm the funding request. Check the account setup and try again." };
+    } catch (error) {
+      console.error("Paga USD funding request outcome is unconfirmed", { referenceNumber, error });
+      await db.pagaUsdCollection.update({ where: { id: payment.id }, data: { failureReason: "Provider request outcome unknown: Paga did not confirm whether it created these instructions. Check this reference's status before creating another request." } });
+      return { error: `Paga did not confirm request ${referenceNumber}. Check its status before creating another request.` };
     }
     revalidatePath("/workspace/funding");
     return { success: `USD payment instructions created. Reference: ${referenceNumber}` };
@@ -103,8 +124,19 @@ export async function verifyUsdFundingRequest(_state: { error?: string; success?
     const data = result.data as Record<string, unknown>;
     const paid = String(data.statusCode) === "0";
     const pending = String(data.statusCode) === "1";
-    if (!paid && !pending) return { error: typeof data.statusMessage === "string" ? `Paga status: ${data.statusMessage}` : "Paga reports that this payment has not completed." };
-    if (!paid) return { success: "Paga confirms the funding request is still pending. Kintovo has not credited the account." };
+    if (!paid && !pending) {
+      const terminalFailure = ["-2", "-3", "114", "115", "121"].includes(String(data.statusCode));
+      if (terminalFailure) await db.pagaUsdCollection.update({ where: { id: payment.id }, data: { status: "FAILED", failureReason: typeof data.statusMessage === "string" ? data.statusMessage.slice(0, 300) : "Paga confirmed that this request cannot be paid." } });
+      revalidatePath("/workspace/funding");
+      return { error: typeof data.statusMessage === "string" ? `Paga status: ${data.statusMessage}` : "Paga reports that this payment has not completed." };
+    }
+    if (!paid) {
+      if (payment.status === "REQUESTED" && payment.failureReason?.startsWith("Provider request outcome unknown:")) {
+        await db.pagaUsdCollection.update({ where: { id: payment.id }, data: { failureReason: null } });
+        revalidatePath("/workspace/funding");
+      }
+      return { success: "Paga confirms the funding request is active and still pending. Kintovo has not credited the account." };
+    }
     if (payment.status === "TOP_UP_PENDING" && payment.creditedAmountMinor && payment.account.status === "ACTIVE") {
       const amountNgn = (Number(payment.creditedAmountMinor) / 100).toFixed(2);
       const topUp = await topUpPagaSubsidiaryAccount({ accountReference: payment.account.accountReference, referenceNumber: payment.topUpReference, amountNgn, narration: `USD collection ${payment.referenceNumber}`.slice(0, 100) });
