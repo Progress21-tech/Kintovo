@@ -6,6 +6,8 @@ import { z } from "zod";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { createSimulatedSettlement } from "@/server/payments";
+import { approvePagaWithdrawal, reconcilePagaBankTransfer } from "@/server/paga-payouts";
+import { reconcilePagaCompensationTransfer, transferApprovedMilestoneCompensation } from "@/server/paga-compensation";
 
 async function requireFinance() {
   const user = await requireUser();
@@ -99,27 +101,50 @@ export async function reviewWithdrawalRequest(formData: FormData) {
   if (!input.success) return;
   const request = await db.withdrawalRequest.findUnique({ where: { id: input.data.requestId }, select: { id: true, userId: true, status: true, reviewAfter: true, amount: true, currency: true } });
   if (!request || request.status !== "PENDING_REVIEW" || request.reviewAfter > new Date()) return;
-  await db.$transaction(async (tx) => {
-    let decision = input.data.decision;
-    let note = input.data.note;
-    if (decision === "APPROVED") {
-      const [obligations, reservations] = await Promise.all([
-        tx.compensationObligation.findMany({ where: { recipientId: request.userId, currency: request.currency, status: { in: ["SIMULATED_PAID", "PROVIDER_CONFIRMED_PAID", "REFUNDED"] } }, include: { ledgerEntries: true } }),
-        tx.withdrawalRequest.findMany({ where: { userId: request.userId, currency: request.currency, status: { in: ["PENDING_REVIEW", "APPROVED"] }, id: { not: request.id } }, select: { amount: true } }),
-      ]);
-      const settled = obligations.reduce((sum, item) => sum + item.ledgerEntries.filter((entry) => ["SIMULATED_SETTLEMENT", "PROVIDER_SETTLEMENT"].includes(entry.kind)).reduce((total, entry) => total + entry.amount, 0), 0);
-      const refunded = obligations.reduce((sum, item) => sum + item.ledgerEntries.filter((entry) => ["SIMULATED_REFUND", "PROVIDER_REFUND"].includes(entry.kind)).reduce((total, entry) => total + entry.amount, 0), 0);
-      const reserved = reservations.reduce((sum, item) => sum + item.amount, 0);
-      if (request.amount > Math.max(0, settled - refunded - reserved)) {
-        decision = "REJECTED";
-        note = "Rejected because refunds or another withdrawal changed the available balance during review. " + note;
-      }
+  if (input.data.decision === "APPROVED") {
+    try {
+      await approvePagaWithdrawal({ requestId: request.id, reviewerId: user.id, note: input.data.note });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Paga payout could not be started.";
+      await db.withdrawalRequest.updateMany({ where: { id: request.id, status: "PENDING_REVIEW" }, data: { reviewNote: `Approval blocked: ${reason}` } });
     }
-    const changed = await tx.withdrawalRequest.updateMany({ where: { id: request.id, status: "PENDING_REVIEW", reviewAfter: { lte: new Date() } }, data: { status: decision, reviewedAt: new Date(), reviewerId: user.id, reviewNote: note } });
-    if (changed.count !== 1) return;
-    await tx.notification.create({ data: { userId: request.userId, title: `Withdrawal request ${decision.toLowerCase()}`, body: `${note} ${decision === "APPROVED" ? "The request is approved for provider processing when payouts are enabled; this action does not transfer funds." : "The reserved amount is available again."}` } });
-    await tx.auditLog.create({ data: { actorId: user.id, action: `WITHDRAWAL_${decision}`, entityType: "WithdrawalRequest", entityId: request.id, metadata: { amount: request.amount, currency: request.currency, note } } });
-  });
+  } else {
+    await db.$transaction(async (tx) => {
+      const changed = await tx.withdrawalRequest.updateMany({ where: { id: request.id, status: "PENDING_REVIEW", reviewAfter: { lte: new Date() } }, data: { status: "REJECTED", reviewedAt: new Date(), reviewerId: user.id, reviewNote: input.data.note } });
+      if (changed.count !== 1) return;
+      await tx.notification.create({ data: { userId: request.userId, title: "Withdrawal request rejected", body: `${input.data.note} The reserved amount is available again.` } });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "WITHDRAWAL_REJECTED", entityType: "WithdrawalRequest", entityId: request.id, metadata: { amount: request.amount, currency: request.currency, note: input.data.note } } });
+    });
+  }
+  revalidatePath("/workspace/operations/finance");
+  revalidatePath("/workspace/earnings");
+}
+
+export async function reconcilePagaWithdrawal(formData: FormData) {
+  const user = await requireFinance();
+  const payoutId = z.string().min(1).safeParse(formData.get("payoutId"));
+  if (!payoutId.success) return;
+  try {
+    const result = await reconcilePagaBankTransfer(payoutId.data, user.id);
+    if (!result.confirmed) {
+      await db.pagaPayout.update({ where: { id: payoutId.data }, data: { failureReason: result.message } });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Paga status check failed.";
+    await db.pagaPayout.updateMany({ where: { id: payoutId.data }, data: { failureReason: message.slice(0, 500) } });
+  }
+  revalidatePath("/workspace/operations/finance");
+  revalidatePath("/workspace/earnings");
+}
+
+export async function reconcilePagaCompensation(formData: FormData) {
+  const user = await requireFinance();
+  const id = z.string().min(1).safeParse(formData.get("obligationId"));
+  if (!id.success) return;
+  const obligation = await db.compensationObligation.findUnique({ where: { id: id.data }, include: { pagaTransfer: true } });
+  if (!obligation || obligation.simulated || obligation.status !== "PENDING" || obligation.currency !== "NGN") return;
+  if (obligation.pagaTransfer) await reconcilePagaCompensationTransfer(obligation.pagaTransfer.id);
+  else await transferApprovedMilestoneCompensation(obligation.id);
   revalidatePath("/workspace/operations/finance");
   revalidatePath("/workspace/earnings");
 }

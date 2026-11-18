@@ -35,7 +35,7 @@ export function WorkspaceNav({ business, businessFunding, specialist, creator, o
     ...(business || creator ? [{ icon: Megaphone, label: "Campaigns", href: "/workspace/campaigns" }] : []),
     ...(specialist || creator ? [
       { icon: Activity, label: "Professional home", href: "/workspace/professional" },
-      { icon: CircleDollarSign, label: "Earnings", href: "/workspace/earnings" },
+      { icon: CircleDollarSign, label: "Wallet & payouts", href: "/workspace/earnings" },
       { icon: ShieldCheck, label: "Trust and evidence", href: "/workspace/profile/trust" },
       { icon: BriefcaseBusiness, label: "Opportunities", href: "/workspace/opportunities" },
       { icon: ClipboardCheck, label: "Assessments", href: "/workspace/profile/assessments" },

@@ -4,6 +4,7 @@ import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { PagaAccountProvisionForm } from "./PagaAccountProvisionForm";
 import { UsdFundingForm } from "./UsdFundingForm";
+import { UsdFundingVerificationForm } from "./UsdFundingVerificationForm";
 
 function formatNgn(minor: bigint | null) {
   if (minor === null) return "Not synced";
@@ -21,7 +22,7 @@ export default async function FundingPage() {
   const sandboxEnabled = process.env.PAGA_ENABLE_SANDBOX === "true";
   const usdCollections = account ? await db.pagaUsdCollection.findMany({
     where: { accountId: account.id },
-    select: { referenceNumber: true, requestedNgnMinor: true, status: true, responseData: true, failureReason: true, createdAt: true },
+    select: { referenceNumber: true, requestedNgnMinor: true, reportedNgnMinor: true, creditedAmountMinor: true, status: true, responseData: true, failureReason: true, createdAt: true },
     orderBy: { createdAt: "desc" },
     take: 5,
   }) : [];
@@ -73,7 +74,7 @@ export default async function FundingPage() {
       const responseData = response.data && typeof response.data === "object" && !Array.isArray(response.data) ? response.data as Record<string, unknown> : response;
       const methods = Array.isArray(responseData.paymentMethods) ? responseData.paymentMethods : [];
       return <article className="panel earnings-row" key={item.referenceNumber}>
-        <div><strong>NGN {(Number(item.requestedNgnMinor) / 100).toLocaleString("en-NG")}</strong><small>{item.referenceNumber} · {item.createdAt.toLocaleString("en-NG")}</small>{item.failureReason && <small>{item.failureReason}</small>}</div>
+        <div><strong>Requested NGN {(Number(item.requestedNgnMinor) / 100).toLocaleString("en-NG")}</strong><small>{item.referenceNumber} · {item.createdAt.toLocaleString("en-NG")}</small>{item.reportedNgnMinor !== null && item.reportedNgnMinor !== item.requestedNgnMinor && <small>Paga reported NGN {(Number(item.reportedNgnMinor) / 100).toLocaleString("en-NG")}; Kintovo credited NGN {(Number(item.creditedAmountMinor ?? BigInt(0)) / 100).toLocaleString("en-NG")} pending reconciliation.</small>}{item.failureReason && <small>{item.failureReason}</small>}{["REQUESTED", "CAPTURED", "TOP_UP_PENDING"].includes(item.status) ? <UsdFundingVerificationForm referenceNumber={item.referenceNumber} /> : null}</div>
         <span className={`status-pill ${item.status === "COMPLETED" ? "green" : item.status === "FAILED" || item.status === "FUNDING_FAILED" ? "amber" : "blue"}`}>{item.status.replaceAll("_", " ")}</span>
         {methods.map((method, index) => {
           const rail = method && typeof method === "object" && !Array.isArray(method) ? method as Record<string, unknown> : {};

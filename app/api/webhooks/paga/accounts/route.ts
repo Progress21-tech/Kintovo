@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { db } from "@/server/db";
 import { getPagaConfiguration, verifyPagaSha512 } from "@/server/paga";
+import { startPagaBankTransfer } from "@/server/paga-payouts";
 
 const fundingHashFields = ["transactionReference", "transactionDate", "amount", "accountNumber", "timestamp"] as const;
 
@@ -44,11 +46,25 @@ async function handleOperationNotification(body: Record<string, unknown>) {
   if (!amountMinor) return NextResponse.json({ status: "INVALID" }, { status: 400 });
   const account = await db.pagaAccount.findFirst({ where: { accountReference: body.accountReference, accountNumber: body.accountNumber }, select: { id: true, status: true } });
   if (!account || account.status !== "ACTIVE") return NextResponse.json({ status: "UNKNOWN_ACCOUNT" }, { status: 404 });
+  const payout = event === "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE"
+    ? await db.pagaPayout.findUnique({ where: { chargeReference: body.externalReferenceNumber as string }, select: { id: true, accountId: true, withdrawalRequestId: true } })
+    : null;
+  if (payout && payout.accountId !== account.id) return NextResponse.json({ status: "PAYOUT_ACCOUNT_MISMATCH" }, { status: 409 });
+  const compensationTransfer = event === "SUBSIDIARY_ACCOUNT_TRANSFER_COMPLETE"
+    ? await db.pagaCompensationTransfer.findUnique({ where: { referenceNumber: body.externalReferenceNumber as string }, include: { obligation: true } })
+    : null;
+  if (compensationTransfer && (compensationTransfer.sourceAccountId !== account.id || compensationTransfer.amountMinor !== amountMinor)) {
+    return NextResponse.json({ status: "TRANSFER_ACCOUNT_OR_AMOUNT_MISMATCH" }, { status: 409 });
+  }
+  const ledgerAmountMinor = event === "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE" && typeof body.totalDebitAmount === "number"
+    ? amountToMinor(body.totalDebitAmount)
+    : amountMinor;
+  if (!ledgerAmountMinor) return NextResponse.json({ status: "INVALID_AMOUNT" }, { status: 400 });
 
   try {
     await db.$transaction(async (tx) => {
       const usdCollection = event === "SUBSIDIARY_ACCOUNT_TOP_UP_COMPLETE"
-        ? await tx.pagaUsdCollection.findUnique({ where: { topUpReference: body.externalReferenceNumber as string }, select: { id: true, status: true } })
+        ? await tx.pagaUsdCollection.findUnique({ where: { topUpReference: body.externalReferenceNumber as string }, select: { id: true, status: true, failureReason: true } })
         : null;
       await tx.pagaAccountLedgerEntry.create({
         data: {
@@ -56,7 +72,7 @@ async function handleOperationNotification(body: Record<string, unknown>) {
           reference: body.externalReferenceNumber as string,
           direction: expectedType,
           kind: usdCollection ? "USD_COLLECTION_CREDIT" : event === "SUBSIDIARY_ACCOUNT_CHARGE_COMPLETE" ? "WITHDRAWAL_DEBIT" : "ADJUSTMENT",
-          amountMinor,
+          amountMinor: ledgerAmountMinor,
           currency: "NGN",
           providerTransactionId: body.externalReferenceNumber as string,
           providerEventId: body.notificationId as string,
@@ -66,11 +82,22 @@ async function handleOperationNotification(body: Record<string, unknown>) {
       await tx.pagaAccount.update({
         where: { id: account.id },
         data: {
-          ...(expectedType === "CREDIT" ? { lastBalanceMinor: { increment: amountMinor } } : { lastBalanceMinor: { decrement: amountMinor } }),
-          lastBalanceSyncedAt: new Date(),
+          ...(compensationTransfer ? { lastBalanceMinor: null, lastBalanceSyncedAt: null } : expectedType === "CREDIT" ? { lastBalanceMinor: { increment: amountMinor } } : { lastBalanceMinor: { decrement: ledgerAmountMinor } }),
+          ...(!compensationTransfer ? { lastBalanceSyncedAt: new Date() } : {}),
         },
       });
-      if (usdCollection) await tx.pagaUsdCollection.update({ where: { id: usdCollection.id }, data: { status: "COMPLETED", failureReason: null } });
+      if (compensationTransfer) await tx.pagaAccount.update({ where: { id: compensationTransfer.destinationAccountId }, data: { lastBalanceMinor: null, lastBalanceSyncedAt: null } });
+      if (payout) await tx.pagaPayout.update({ where: { id: payout.id }, data: { chargeCompletedAt: new Date(), failureReason: null } });
+      if (usdCollection) await tx.pagaUsdCollection.update({ where: { id: usdCollection.id }, data: { status: "COMPLETED", failureReason: usdCollection.failureReason } });
+      if (compensationTransfer) {
+        const claimed = await tx.pagaCompensationTransfer.updateMany({ where: { id: compensationTransfer.id, completedAt: null }, data: { completedAt: new Date(), providerTransactionId: body.notificationId as string, failureReason: null } });
+        if (claimed.count === 1) {
+          await tx.compensationObligation.update({ where: { id: compensationTransfer.obligationId }, data: { status: "PROVIDER_CONFIRMED_PAID", provider: "PAGA", simulated: false, paidAt: new Date(), failureReason: null } });
+          const existing = await tx.ledgerEntry.findFirst({ where: { obligationId: compensationTransfer.obligationId, kind: "PROVIDER_SETTLEMENT" }, select: { id: true } });
+          if (!existing) await tx.ledgerEntry.create({ data: { obligationId: compensationTransfer.obligationId, kind: "PROVIDER_SETTLEMENT", amount: compensationTransfer.obligation.amount, currency: compensationTransfer.obligation.currency, simulated: false, providerEventId: body.notificationId as string } });
+          if (compensationTransfer.obligation.recipientId) await tx.notification.create({ data: { userId: compensationTransfer.obligation.recipientId, title: "Compensation received", body: "Paga confirmed the NGN transfer to your Kintovo Paga account." } });
+        }
+      }
     });
   } catch (error) {
     if (!(error && typeof error === "object" && "code" in error && error.code === "P2002")) {
@@ -78,6 +105,7 @@ async function handleOperationNotification(body: Record<string, unknown>) {
       return NextResponse.json({ status: "RETRY" }, { status: 500 });
     }
   }
+  if (payout) after(async () => { await startPagaBankTransfer(payout.id); });
   return NextResponse.json({ status: "SUCCESS" });
 }
 

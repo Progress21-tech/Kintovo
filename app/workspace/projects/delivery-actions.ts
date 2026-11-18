@@ -7,6 +7,7 @@ import { db } from "@/server/db";
 import { canApproveSpend, canManageProjects } from "@/server/permissions";
 import { getProjectAccess } from "@/server/project-access";
 import { canTransitionMilestone, canTransitionTask, type MilestoneState, type TaskState } from "@/server/workflow";
+import { transferApprovedMilestoneCompensation } from "@/server/paga-compensation";
 
 function refreshProject(id: string) { revalidatePath(`/workspace/projects/${id}`); }
 function parsedDate(value: string | undefined) { if (!value?.trim()) return null; const date = new Date(`${value}T12:00:00.000Z`); return Number.isNaN(date.getTime()) ? undefined : date; }
@@ -113,6 +114,7 @@ export async function reviewMilestone(formData: FormData) {
   if (!membership || !canManageProjects(membership.role) || !["SUBMITTED", "IN_REVIEW"].includes(milestone.status)) return;
   if (input.data.decision === "REVISION_REQUESTED" && milestone.revisionCount >= milestone.revisionAllowance) return;
   const nextStatus = input.data.decision;
+  let pagaObligationId: string | null = null;
   await db.$transaction(async (tx) => {
     if (milestone.status === "SUBMITTED") {
       await tx.milestoneEvent.create({ data: { milestoneId: milestone.id, actorId: user.id, fromStatus: "SUBMITTED", toStatus: "IN_REVIEW", note: "Buyer review started." } });
@@ -122,12 +124,19 @@ export async function reviewMilestone(formData: FormData) {
     await tx.milestoneEvent.create({ data: { milestoneId: milestone.id, actorId: user.id, fromStatus: "IN_REVIEW", toStatus: nextStatus, note: input.data.note } });
     if (nextStatus === "APPROVED" && milestone.amount > 0 && milestone.assignedProfile) {
       const existingObligation = await tx.compensationObligation.findUnique({ where: { milestoneId: milestone.id }, select: { id: true } });
-      if (!existingObligation) await tx.compensationObligation.create({ data: { reference: `MILESTONE-${milestone.id}`, projectId: milestone.project.id, milestoneId: milestone.id, recipientId: milestone.assignedProfile.userId, createdById: user.id, amount: milestone.amount, currency: milestone.currency, provider: "MOCK", simulated: true } });
+      if (!existingObligation) {
+        const obligation = await tx.compensationObligation.create({ data: { reference: `MILESTONE-${milestone.id}`, projectId: milestone.project.id, milestoneId: milestone.id, recipientId: milestone.assignedProfile.userId, createdById: user.id, amount: milestone.amount, currency: milestone.currency, provider: "PAGA", simulated: false } });
+        pagaObligationId = obligation.id;
+      }
     }
     if (nextStatus === "DISPUTED") await tx.dispute.create({ data: { projectId: milestone.project.id, milestoneId: milestone.id, openedById: user.id, issueType: "DELIVERY_REVIEW", description: input.data.note, amountAffected: milestone.amount } });
     await tx.auditLog.create({ data: { actorId: user.id, action: `MILESTONE_${nextStatus}`, entityType: "Milestone", entityId: milestone.id } });
     if (milestone.assignedProfile) await tx.notification.create({ data: { userId: milestone.assignedProfile.userId, title: `Milestone ${nextStatus.replaceAll("_", " ").toLowerCase()}`, body: input.data.note } });
   });
+  if (nextStatus === "APPROVED" && pagaObligationId) await transferApprovedMilestoneCompensation(pagaObligationId);
+  revalidatePath("/workspace/earnings");
+  revalidatePath("/workspace/funding");
+  revalidatePath("/workspace/operations/finance");
   refreshProject(milestone.project.id);
 }
 

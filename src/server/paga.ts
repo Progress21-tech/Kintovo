@@ -222,6 +222,25 @@ export async function chargePagaSubsidiaryAccount(input: { accountReference: str
   });
 }
 
+/** Transfer NGN between two ledger-backed Paga subsidiary accounts. */
+export async function transferPagaSubsidiaryAccount(input: { sourceAccountReference: string; destinationAccountReference: string; referenceNumber: string; amountNgn: string; narration?: string }) {
+  const config = getPagaConfiguration();
+  const source = requiredText(input.sourceAccountReference, "sourceAccountReference");
+  const destination = requiredText(input.destinationAccountReference, "destinationAccountReference");
+  if (source === destination) throw new Error("Paga transfer source and destination must differ.");
+  const reference = requiredText(input.referenceNumber, "referenceNumber");
+  const amount = Number(requiredText(input.amountNgn, "amountNgn"));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("amountNgn must be a positive number.");
+  const narration = input.narration ?? "";
+  const hash = pagaSha512([reference, source, destination, String(amount), "NGN", narration], config.hashKey);
+  return pagaRequest<PagaJson>({
+    url: `${config.collectBaseUrl}/subsidiary-accounts/transfer`,
+    method: "POST",
+    headers: { Authorization: `Basic ${Buffer.from(`${config.publicKey}:${config.secretKey}`).toString("base64")}`, hash, "Content-Type": "application/json", Accept: "application/json" },
+    body: { referenceNumber: reference, sourceAccountIdentifier: source, destinationAccountIdentifier: destination, amount, currency: "NGN", ...(narration ? { narration } : {}) },
+  });
+}
+
 export async function getPagaBanks(referenceNumber: string) {
   const config = getPagaConfiguration();
   const reference = requiredText(referenceNumber, "referenceNumber");
@@ -259,6 +278,18 @@ export async function depositPagaToBank(input: { referenceNumber: string; amount
     method: "POST",
     headers: businessAuth(config, [reference, amount, bankPublicId, accountNumber]),
     body: { referenceNumber: reference, amount, currency: "NGN", destinationBankUUID: bankPublicId, destinationBankAccountNumber: accountNumber, statusCallbackUrl: callbackUrl },
+  });
+}
+
+/** Reconcile a bank payout reference before considering any retry after a timeout. */
+export async function getPagaBankTransferStatus(referenceNumber: string) {
+  const config = getPagaConfiguration();
+  const reference = requiredText(referenceNumber, "referenceNumber");
+  return pagaRequest<PagaJson>({
+    url: `${config.businessBaseUrl}/paga-webservices/business-rest/secured/transactionStatus`,
+    method: "POST",
+    headers: businessAuth(config, [reference]),
+    body: { referenceNumber: reference, locale: "en" },
   });
 }
 

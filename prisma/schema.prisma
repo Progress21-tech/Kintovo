@@ -896,6 +896,7 @@ model CompensationObligation {
   campaignCreator CampaignCreator? @relation(fields: [campaignCreatorId], references: [id])
   attribution   CampaignAttribution? @relation(fields: [attributionId], references: [id])
   ledgerEntries LedgerEntry[]
+  pagaTransfer  PagaCompensationTransfer?
   @@index([status, createdAt])
 }
 
@@ -910,8 +911,10 @@ model WithdrawalRequest {
   reviewedAt  DateTime?
   reviewerId  String?
   reviewNote  String?
+  pagaBankDestinationId String?
   user        User            @relation("WithdrawalOwner", fields: [userId], references: [id], onDelete: Cascade)
   reviewer    User?           @relation("WithdrawalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  pagaBankDestination PagaBankDestination? @relation(fields: [pagaBankDestinationId], references: [id], onDelete: SetNull)
   pagaPayout  PagaPayout?
   @@index([status, reviewAfter])
   @@index([userId, status, requestedAt])
@@ -936,7 +939,28 @@ model PagaAccount {
   entries                  PagaAccountLedgerEntry[]
   payouts                  PagaPayout[]
   usdCollections           PagaUsdCollection[]
+  outgoingCompensationTransfers PagaCompensationTransfer[] @relation("PagaCompensationSource")
+  incomingCompensationTransfers PagaCompensationTransfer[] @relation("PagaCompensationDestination")
   @@index([status, createdAt])
+}
+
+model PagaCompensationTransfer {
+  id                    String   @id @default(cuid())
+  obligationId          String   @unique
+  sourceAccountId       String
+  destinationAccountId  String
+  referenceNumber       String   @unique
+  amountMinor           BigInt
+  providerTransactionId String?  @unique
+  startedAt             DateTime?
+  completedAt           DateTime?
+  failureReason         String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  obligation            CompensationObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  sourceAccount         PagaAccount @relation("PagaCompensationSource", fields: [sourceAccountId], references: [id])
+  destinationAccount    PagaAccount @relation("PagaCompensationDestination", fields: [destinationAccountId], references: [id])
+  @@index([completedAt, createdAt])
 }
 
 model PagaUsdCollection {
@@ -995,6 +1019,7 @@ model PagaBankDestination {
   updatedAt             DateTime @updatedAt
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   payouts               PagaPayout[]
+  withdrawalRequests    WithdrawalRequest[]
   @@index([userId, isDefault])
 }
 
@@ -1007,9 +1032,11 @@ model PagaPayout {
   amountMinor           BigInt
   chargeReference       String   @unique
   payoutReference       String   @unique
+  chargeStartedAt       DateTime?
   chargeTransactionId   String?
   payoutTransactionId   String?
   chargeCompletedAt     DateTime?
+  payoutStartedAt       DateTime?
   payoutCompletedAt     DateTime?
   failureReason         String?
   createdAt             DateTime @default(now())

@@ -8,6 +8,7 @@ import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
 import { calculateCreatorBonus, validManualAttributionEventId } from "@/server/campaigns";
 import { platformFlag } from "@/server/settings";
+import { transferApprovedMilestoneCompensation } from "@/server/paga-compensation";
 
 const currencies = ["NGN", "USD", "GBP", "EUR"] as const;
 function integer(value: FormDataEntryValue | null, fallback = 0) { const raw = String(value ?? "").trim(); if (!raw) return fallback; const result = Number(raw); return Number.isSafeInteger(result) && result >= 0 && result <= 2_147_483_647 ? result : NaN; }
@@ -148,14 +149,21 @@ export async function recordPublishedContent(formData: FormData) {
   if (!input.success) return;
   const content = await db.campaignContent.findUnique({ where: { id: input.data.contentId }, include: { campaignCreator: { include: { creator: { select: { userId: true } }, campaign: true } } } });
   if (!content || content.campaignCreator.creator.userId !== user.id || content.status !== "APPROVED") return;
+  let pagaObligationId: string | null = null;
   await db.$transaction(async (tx) => {
     await tx.campaignContent.update({ where: { id: content.id }, data: { status: "PUBLISHED", publishedUrl: input.data.publishedUrl, publishedAt: new Date() } });
     if (content.campaignCreator.fixedFee > 0) {
       const existing = await tx.compensationObligation.findUnique({ where: { campaignCreatorId: content.campaignCreatorId }, select: { id: true } });
-      if (!existing) await tx.compensationObligation.create({ data: { reference: `CAMPAIGN-${content.campaignCreatorId}`, campaignCreatorId: content.campaignCreatorId, recipientId: content.campaignCreator.creator.userId, createdById: content.campaignCreator.campaign.createdById, amount: content.campaignCreator.fixedFee, currency: content.campaignCreator.campaign.currency, provider: "MOCK", simulated: true } });
+      if (!existing) {
+        const obligation = await tx.compensationObligation.create({ data: { reference: `CAMPAIGN-${content.campaignCreatorId}`, campaignCreatorId: content.campaignCreatorId, recipientId: content.campaignCreator.creator.userId, createdById: content.campaignCreator.campaign.createdById, amount: content.campaignCreator.fixedFee, currency: content.campaignCreator.campaign.currency, provider: "PAGA", simulated: false } });
+        pagaObligationId = obligation.id;
+      }
     }
     await tx.auditLog.create({ data: { actorId: user.id, action: "CAMPAIGN_CONTENT_PUBLISHED", entityType: "CampaignContent", entityId: content.id } });
   });
+  if (pagaObligationId) await transferApprovedMilestoneCompensation(pagaObligationId);
+  revalidatePath("/workspace/earnings");
+  revalidatePath("/workspace/operations/finance");
   revalidatePath("/workspace/campaigns");
 }
 
@@ -182,6 +190,7 @@ export async function reviewManualAttribution(formData: FormData) {
   const attribution = await db.campaignAttribution.findUnique({ where: { id: input.data.attributionId }, include: { campaignCreator: { include: { campaign: true, creator: { select: { userId: true } } } } } });
   if (!attribution || attribution.status !== "PENDING") return;
   const reviewedAt = new Date();
+  let pagaObligationId: string | null = null;
   await db.$transaction(async (tx) => {
     let bonusAmount = 0;
     if (input.data.decision === "APPROVED") {
@@ -189,9 +198,15 @@ export async function reviewManualAttribution(formData: FormData) {
       bonusAmount = calculateCreatorBonus(attribution.amount, attribution.campaignCreator.bonusRate, attribution.campaignCreator.bonusCap, previous._sum.bonusAmount ?? 0);
     }
     await tx.campaignAttribution.update({ where: { id: attribution.id }, data: { status: input.data.decision, reviewedAt, reviewerId: user.id, reviewerNote: input.data.reviewerNote, bonusAmount } });
-    if (bonusAmount > 0 && input.data.decision === "APPROVED") await tx.compensationObligation.create({ data: { reference: `BONUS-${attribution.id}`, attributionId: attribution.id, recipientId: attribution.campaignCreator.creator.userId, createdById: attribution.campaignCreator.campaign.createdById, amount: bonusAmount, currency: attribution.currency, provider: "MOCK", simulated: true } });
+    if (bonusAmount > 0 && input.data.decision === "APPROVED") {
+      const obligation = await tx.compensationObligation.create({ data: { reference: `BONUS-${attribution.id}`, attributionId: attribution.id, recipientId: attribution.campaignCreator.creator.userId, createdById: attribution.campaignCreator.campaign.createdById, amount: bonusAmount, currency: attribution.currency, provider: "PAGA", simulated: false } });
+      pagaObligationId = obligation.id;
+    }
     await tx.auditLog.create({ data: { actorId: user.id, action: `CAMPAIGN_ATTRIBUTION_${input.data.decision}`, entityType: "CampaignAttribution", entityId: attribution.id, metadata: { bonusAmount } } });
   });
+  if (pagaObligationId) await transferApprovedMilestoneCompensation(pagaObligationId);
+  revalidatePath("/workspace/earnings");
+  revalidatePath("/workspace/operations/finance");
   revalidatePath("/workspace/campaigns");
   revalidatePath("/workspace/operations/campaigns");
 }

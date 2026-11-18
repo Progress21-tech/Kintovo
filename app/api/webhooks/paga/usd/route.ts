@@ -63,10 +63,11 @@ export async function POST(request: Request) {
     if (!reportedDestinationMinor || payment.account.status !== "ACTIVE") return NextResponse.json({ status: "INVALID_AMOUNT" }, { status: 400 });
 
     // The USD callback has no documented signature header. The authenticated
-    // Paga status API proves this reference was paid, but callback FX details
-    // must not determine the amount credited. Credit only the NGN amount that
-    // Kintovo originally requested; preserve the callback for reconciliation.
-    const destinationMinor = payment.requestedNgnMinor;
+    // Paga status API proves this reference was paid. Use the callback's settled
+    // conversion conservatively: never credit above the requested amount, and
+    // preserve any FX discrepancy for later reconciliation.
+    const destinationMinor = reportedDestinationMinor < payment.requestedNgnMinor ? reportedDestinationMinor : payment.requestedNgnMinor;
+    const fxMismatch = reportedDestinationMinor !== payment.requestedNgnMinor;
     const sourceAmounts = body.receivedAmounts && typeof body.receivedAmounts === "object" && !Array.isArray(body.receivedAmounts)
       ? (body.receivedAmounts as Record<string, unknown>).amounts
       : null;
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
         reportedNgnMinor: reportedDestinationMinor,
         foreignExchangeRate: typeof details.foreignExchangeRate === "number" ? String(details.foreignExchangeRate) : null,
         webhookData: JSON.parse(rawBody),
-        failureReason: null,
+        failureReason: fxMismatch ? "Paga's reported NGN settlement differed from the requested amount. A conservative credit was recorded; reconcile the difference in Paga." : null,
       },
     });
     const current = await db.pagaUsdCollection.findUnique({ where: { id: payment.id }, select: { status: true, creditedAmountMinor: true, paymentId: true } });
