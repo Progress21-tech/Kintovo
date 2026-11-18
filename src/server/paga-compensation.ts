@@ -14,10 +14,36 @@ export async function transferApprovedMilestoneCompensation(obligationId: string
   const obligation = await db.compensationObligation.findUnique({
     where: { id: obligationId },
     include: {
-      project: { include: { organisation: { include: { pagaAccount: true } } } },
-      recipient: { include: { pagaAccount: true } },
-      campaignCreator: { include: { campaign: { include: { organisation: { include: { pagaAccount: true } } } } } },
-      attribution: { include: { campaignCreator: { include: { campaign: { include: { organisation: { include: { pagaAccount: true } } } } } } },
+      project: {
+        include: {
+          organisation: { include: { pagaAccount: true } },
+        },
+      },
+      recipient: {
+        include: { pagaAccount: true },
+      },
+      campaignCreator: {
+        include: {
+          campaign: {
+            include: {
+              organisation: { include: { pagaAccount: true } },
+            },
+          },
+        },
+      },
+      attribution: {
+        include: {
+          campaignCreator: {
+            include: {
+              campaign: {
+                include: {
+                  organisation: { include: { pagaAccount: true } },
+                },
+              },
+            },
+          },
+        },
+      },
       pagaTransfer: true,
     },
   });
