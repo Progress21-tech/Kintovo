@@ -39,3 +39,39 @@ export async function updateAccountAccess(formData: FormData) {
   revalidatePath("/workspace/admin");
   revalidatePath("/workspace/admin/users");
 }
+
+export async function changePlatformRole(formData: FormData) {
+  const actor = await requireUser();
+  if (actor.platformRole !== "ADMIN") redirect("/workspace");
+  const parsed = z.object({
+    userId: z.string().min(1),
+    platformRole: z.enum(["USER", "OPERATIONS", "FINANCE", "ADMIN"]),
+  }).safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success || parsed.data.userId === actor.id) return;
+  const target = await db.user.findUnique({
+    where: { id: parsed.data.userId },
+    select: { id: true, platformRole: true, bannedAt: true, disabledAt: true },
+  });
+  if (!target || target.platformRole === parsed.data.platformRole) return;
+  await db.$transaction([
+    db.user.update({
+      where: { id: target.id },
+      data: { platformRole: parsed.data.platformRole },
+    }),
+    db.auditLog.create({
+      data: {
+        actorId: actor.id,
+        action: "ACCOUNT_PLATFORM_ROLE_CHANGED",
+        entityType: "User",
+        entityId: target.id,
+        metadata: {
+          from: target.platformRole,
+          to: parsed.data.platformRole,
+        },
+      },
+    }),
+  ]);
+  revalidatePath("/workspace/admin");
+  revalidatePath("/workspace/admin/users");
+  revalidatePath("/workspace/operations");
+}

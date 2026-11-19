@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
-import { updateAccountAccess } from "../actions";
+import { changePlatformRole, updateAccountAccess } from "../actions";
 
 type Search = { q?: string; state?: string };
 
@@ -84,6 +84,19 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <p className="field-note">Obligations initiated: {payerTotals.get(person.id)?.join(" · ") ?? "None"} {payerTotals.has(person.id) ? "(includes simulated settlement records)" : ""}</p>
             <p className="field-note">Project reputation: {reputation.get(person.id) ?? "No completed-project ratings"}</p>
             {person.banReason && <p className="legal-note">Ban reason: {person.banReason}</p>}
+            {person.id !== actor.id && <form action={changePlatformRole} className="inline-form">
+              <input type="hidden" name="userId" value={person.id} />
+              <label>Platform role
+                <select name="platformRole" defaultValue={person.platformRole}>
+                  <option value="USER">User</option>
+                  <option value="OPERATIONS">Operations</option>
+                  <option value="FINANCE">Finance</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </label>
+              <button className="button button-secondary button-small">Change role</button>
+            </form>}
+            {person.id === actor.id && <p className="field-note">Your platform role cannot be changed from this screen to prevent losing administrator access.</p>}
             {person.id !== actor.id && !person.bannedAt && <div className="admin-account-actions">
               {person.disabledAt ? <form action={updateAccountAccess} className="inline-form"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="action" value="RESTORE" /><label>Reason for restoring access<input name="reason" minLength={8} maxLength={1000} required /></label><button className="button button-secondary button-small">Restore access</button></form> : <form action={updateAccountAccess} className="inline-form"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="action" value="SUSPEND" /><label>Reason for temporary suspension<input name="reason" minLength={8} maxLength={1000} required /></label><button className="button button-secondary button-small">Suspend temporarily</button></form>}
               <details className="workflow-details"><summary>Ban this account permanently</summary><form action={updateAccountAccess} className="form-stack"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="action" value="BAN" /><label>Reason<textarea name="reason" minLength={8} maxLength={1000} required /></label><p className="field-note">This permanently blocks this account from signing in. The account and audit records are retained; this action does not delete personal data or block access from other IP addresses.</p><button className="button button-secondary button-small">Permanently ban account</button></form></details>
