@@ -1,0 +1,42 @@
+name: Apply database migrations to Neon
+
+# Applies committed, reviewed Prisma migrations to the production Neon database.
+# Safe to re-run: `prisma migrate deploy` only applies migrations that have not been applied yet,
+# and never resets or drops the database.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
+      DATABASE_URL: ${{ secrets.NEON_DIRECT_URL }}
+      CHECKPOINT_DISABLE: "1"
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.18.0"
+
+      - name: Check required database secret
+        run: |
+          if [ -z "$DIRECT_URL" ]; then
+            echo "Repository secret NEON_DIRECT_URL is missing."
+            exit 1
+          fi
+
+      - name: Install project dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Show migrations waiting to be applied
+        run: npx prisma migrate status || true
+
+      - name: Apply pending migrations
+        run: npx prisma migrate deploy
