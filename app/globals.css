@@ -595,7 +595,7 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   .mobile-nav-toggle { position: fixed; z-index: 3; right: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; border: 1px solid var(--line); border-radius: 999px; padding: 0 14px; color: var(--ink); background: var(--surface); box-shadow: 0 8px 24px rgba(32,37,34,.12); cursor: pointer; font-size: 11px; font-weight: 500; }
   .app-sidebar-shell, .app-sidebar-shell.collapsed { position: fixed; z-index: 10; inset: 58px auto 0 0; width: min(278px, 86vw); height: auto; transform: translateX(-105%); transition: transform .18s ease; box-shadow: 12px 0 30px rgba(32,37,34,.12); }
   .app-sidebar-shell.mobile-open { transform: translateX(0); }
-  .app-sidebar, .app-sidebar-shell.collapsed .app-sidebar { min-height: 100%; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; border-right: 1px solid var(--line); border-bottom: 0; padding: 16px 10px; background: #f3f1eb; }
+  .app-sidebar, .app-sidebar-shell.collapsed .app-sidebar { height: 100%; min-height: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; border-right: 1px solid var(--line); border-bottom: 0; padding: 16px 10px; background: #f3f1eb; }
   .sidebar-heading { display: flex; }
   .sidebar-close-mobile { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid transparent; border-radius: 5px; color: var(--muted); background: transparent; cursor: pointer; }
   .sidebar-close-mobile:hover { border-color: var(--line); color: var(--ink); background: #fff; }

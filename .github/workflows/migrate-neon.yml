@@ -13,8 +13,7 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     env:
-      DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
-      DATABASE_URL: ${{ secrets.NEON_DIRECT_URL }}
+      NEON_URL: ${{ secrets.NEON_DIRECT_URL }}
       CHECKPOINT_DISABLE: "1"
     steps:
       - name: Check out main
@@ -25,12 +24,28 @@ jobs:
         with:
           node-version: "22.18.0"
 
-      - name: Check required database secret
+      - name: Prepare a direct database connection
+        # Migrations need Neon's direct (unpooled) host. If the secret holds the pooled
+        # "-pooler" host, switch to the direct one. Also drop channel_binding (not supported
+        # by Prisma's migration engine), require SSL, and allow time for a sleeping database to wake.
         run: |
-          if [ -z "$DIRECT_URL" ]; then
+          if [ -z "$NEON_URL" ]; then
             echo "Repository secret NEON_DIRECT_URL is missing."
             exit 1
           fi
+          direct_url="$(node -e '
+            const url = new URL(process.env.NEON_URL);
+            url.hostname = url.hostname.replace("-pooler.", ".");
+            url.searchParams.delete("channel_binding");
+            url.searchParams.delete("pgbouncer");
+            url.searchParams.set("sslmode", "require");
+            url.searchParams.set("connect_timeout", "60");
+            process.stdout.write(url.toString());
+          ')"
+          echo "::add-mask::$direct_url"
+          echo "DIRECT_URL=$direct_url" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=$direct_url" >> "$GITHUB_ENV"
+          node -e 'console.log("Using database host:", new URL(process.argv[1]).hostname)' "$direct_url"
 
       - name: Install project dependencies
         run: npm ci --no-audit --no-fund
@@ -39,4 +54,10 @@ jobs:
         run: npx prisma migrate status || true
 
       - name: Apply pending migrations
-        run: npx prisma migrate deploy
+        run: |
+          for attempt in 1 2 3; do
+            if npx prisma migrate deploy; then exit 0; fi
+            echo "Attempt $attempt failed; waiting for the database to wake before retrying."
+            sleep 15
+          done
+          exit 1
