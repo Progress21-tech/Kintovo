@@ -8,6 +8,7 @@ import { canManageProjects } from "@/server/permissions";
 import { buildScopePlan } from "@/server/scoping";
 import { brainstormScope as getScopeBrainstorm, generateScopePlan, isScopeAiConfigured, scopePlanSchema, SCOPE_PROMPT_VERSION, type ScopeChatMessage, type ScopeInput } from "@/server/scope-service";
 import { platformFlag } from "@/server/settings";
+import { allowAiRequest } from "@/server/rate-limit";
 
 const briefSchema = z.object({
   organisationId: z.string().min(1),
@@ -111,6 +112,7 @@ export async function createProjectBrief(_state: { error?: string }, formData: F
     previousAttempts: parsed.data.previousAttempts, expectedOutcomes: parsed.data.expectedOutcomes,
     constraints: parsed.data.constraints, existingResources: parsed.data.existingResources, additionalInformation: parsed.data.additionalInformation,
   };
+  if (parsed.data.aiConsent && !await allowAiRequest(user.id)) return { error: "You have reached the hourly limit for AI planning requests. Try again later or turn off AI for rules-based suggestions." };
   const scopeResult = parsed.data.aiConsent ? await generateScopePlan(scopeInput, conversation, currentPlan) : { plan: buildScopePlan(scopeInput), source: "RULES_V1" as const, promptVersion: SCOPE_PROMPT_VERSION, error: undefined };
   if (!scopeResult.plan) {
     const reason = scopeResult.error;
@@ -182,6 +184,7 @@ export async function brainstormScopePlan(rawInput: unknown) {
   const user = await requireUser();
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: parsed.data.organisationId, userId: user.id } } });
   if (!membership || !canManageProjects(membership.role)) return { error: "You do not have access to plan projects for that organisation." } as const;
+  if (!await allowAiRequest(user.id)) return { error: "You have reached the hourly limit for AI planning messages. Try again later." } as const;
   const deadline = parsed.data.deadline ? new Date(`${parsed.data.deadline}T12:00:00.000Z`) : undefined;
   if (deadline && Number.isNaN(deadline.getTime())) return { error: "Enter a valid deadline before brainstorming." } as const;
   const input: ScopeInput = {

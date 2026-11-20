@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { optionalHttpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canApproveSpend, canManageProjects } from "@/server/permissions";
@@ -142,7 +143,7 @@ export async function startMilestone(formData: FormData) {
 export async function submitMilestone(_state: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const fields = Object.fromEntries([...formData.entries()].filter(([, value]) => typeof value === "string"));
-  const input = z.object({ milestoneId: z.string().min(1), note: z.string().trim().min(8).max(2000), evidenceUrl: z.union([z.literal(""), z.url()]).optional() }).safeParse(fields);
+  const input = z.object({ milestoneId: z.string().min(1), note: z.string().trim().min(8).max(2000), evidenceUrl: optionalHttpUrl().optional() }).safeParse(fields);
   if (!input.success) return { error: input.error.issues[0]?.message ?? "Add a clear submission note." };
   const milestone = await db.milestone.findUnique({ where: { id: input.data.milestoneId }, include: { project: { select: { id: true } }, assignedProfile: { select: { userId: true } } } });
   if (!milestone || milestone.assignedProfile?.userId !== user.id || !canTransitionMilestone(milestone.status as MilestoneState, "SUBMITTED")) return { error: "This milestone is not ready for your submission." };
@@ -380,6 +381,9 @@ export async function respondToChangeRequest(formData: FormData) {
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: change.agreement.engagement.project.organisationId, userId: user.id } } });
   const isTalent = change.agreement.engagement.professional.userId === user.id;
   if (membership ? !canApproveSpend(membership.role, membership.canApproveSpend) : !isTalent) return;
+  // The response must come from the other party, not a colleague of the requester.
+  const requestedByTalent = change.createdById === change.agreement.engagement.professional.userId;
+  if (requestedByTalent ? isTalent || !membership : !isTalent) return;
   const now = new Date();
   await db.$transaction(async (tx) => {
     const claimed = await tx.changeRequest.updateMany({ where: { id: change.id, status: "PENDING" }, data: { status: input.data.decision, responseNote: input.data.responseNote, respondedAt: now } });

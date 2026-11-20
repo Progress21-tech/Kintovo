@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { optionalHttpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
@@ -22,7 +23,7 @@ export async function saveOrganisationSettings(_state: { error?: string; success
   const user = await requireUser();
   const parsed = z.object({
     organisationId: z.string().min(1), name: z.string().trim().min(2).max(120),
-    website: z.union([z.literal(""), z.url()]), industry: z.string().trim().max(120),
+    website: optionalHttpUrl(), industry: z.string().trim().max(120),
     model: z.string().trim().max(120), product: z.string().trim().max(300), location: z.string().trim().max(120),
   }).safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the business details." };

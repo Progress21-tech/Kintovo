@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/server/db";
 import { rateLimitLogin } from "@/server/rate-limit";
+import { sessionFingerprint } from "@/server/session-fingerprint";
 
 const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
 
@@ -51,12 +52,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.warn("[Kintovo auth] credentials denied: email not verified", { email: maskEmail(emailKey) });
           return null;
         }
-        if (!(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
+        // Google-only accounts have no bcrypt hash; treat a malformed hash as a mismatch rather than a server error.
+        if (!user.passwordHash.startsWith("$2") || !(await bcrypt.compare(parsed.data.password, user.passwordHash).catch(() => false))) {
           console.warn("[Kintovo auth] credentials denied: password mismatch", { email: maskEmail(emailKey) });
           return null;
         }
         console.info("[Kintovo auth] credentials sign-in accepted", { email: maskEmail(emailKey) });
-        return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole };
+        return { id: user.id, name: user.name, email: user.email, platformRole: user.platformRole, sessionFingerprint: sessionFingerprint(user.passwordHash) };
       },
     }),
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [Google({
@@ -72,11 +74,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         console.warn("[Kintovo auth] Google sign-in denied: email missing");
         return "/sign-in?notice=google-email-missing";
       }
-      if (requireEmailVerification && profile && "email_verified" in profile && profile.email_verified === false) {
+      const googleVerified = Boolean(profile && "email_verified" in profile && profile.email_verified === true);
+      if (requireEmailVerification && !googleVerified) {
         console.warn("[Kintovo auth] Google sign-in denied: email not verified", { email: maskEmail(email) });
         return "/sign-in?notice=google-email-unverified";
       }
       const existing = await db.user.findUnique({ where: { email } });
+      // Linking a Google identity to an existing password account is only safe when
+      // Google confirms the address belongs to this person; otherwise it is an account takeover.
+      if (existing && !googleVerified) {
+        console.warn("[Kintovo auth] Google sign-in denied: unverified email matches an existing account", { email: maskEmail(email) });
+        return "/sign-in?notice=google-email-unverified";
+      }
       if (existing?.disabledAt || existing?.bannedAt) {
         console.warn("[Kintovo auth] Google sign-in denied: account unavailable", {
           email: maskEmail(email),
@@ -90,7 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name?.trim() || email.split("@")[0],
           email,
           passwordHash: `oauth_google_${randomBytes(32).toString("hex")}`,
-          emailVerifiedAt: new Date(),
+          emailVerifiedAt: googleVerified ? new Date() : null,
         },
       });
       if (existing && !existing.emailVerifiedAt) {
@@ -99,19 +108,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       user.id = persisted.id;
       user.name = persisted.name;
       user.email = persisted.email;
+      user.platformRole = persisted.platformRole;
+      user.sessionFingerprint = sessionFingerprint(persisted.passwordHash);
       console.info("[Kintovo auth] Google sign-in accepted", { email: maskEmail(email), existing: Boolean(existing) });
       return true;
     },
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        token.platformRole = (user as typeof user & { platformRole?: string }).platformRole ?? "USER";
+        token.platformRole = user.platformRole ?? "USER";
+        token.sessionFingerprint = user.sessionFingerprint;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) session.user.id = token.sub;
-      if (session.user) session.user.platformRole = typeof token.platformRole === "string" ? token.platformRole : "USER";
+      if (session.user) {
+        session.user.platformRole = typeof token.platformRole === "string" ? token.platformRole : "USER";
+        session.user.sessionFingerprint = typeof token.sessionFingerprint === "string" ? token.sessionFingerprint : undefined;
+      }
       return session;
     },
   },

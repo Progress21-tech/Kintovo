@@ -3,7 +3,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
+import { optionalHttpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canAssignOrganisationRole, canInviteOrganisationMembers } from "@/server/permissions";
@@ -12,7 +14,7 @@ import { ensurePagaOrganisationAccount } from "@/server/paga-accounts";
 
 const organisationSchema = z.object({
   name: z.string().trim().min(2).max(120),
-  website: z.union([z.literal(""), z.url()]).optional(),
+  website: optionalHttpUrl().optional(),
   industry: z.string().trim().max(120).optional(),
   model: z.string().trim().max(120).optional(),
   product: z.string().trim().max(300).optional(),
@@ -41,11 +43,14 @@ export async function createOrganisation(_state: { error?: string; success?: str
     await tx.auditLog.create({ data: { actorId: user.id, action: "ORGANISATION_CREATED", entityType: "Organisation", entityId: created.id } });
     return created;
   });
-  try {
-    await ensurePagaOrganisationAccount(organisation.id);
-  } catch (error) {
-    console.error("Paga Sandbox organisation account provisioning did not complete", { organisationId: organisation.id, error });
-  }
+  // Provision after the response so the payment provider never delays the redirect.
+  after(async () => {
+    try {
+      await ensurePagaOrganisationAccount(organisation.id);
+    } catch (error) {
+      console.error("Paga Sandbox organisation account provisioning did not complete", { organisationId: organisation.id, error });
+    }
+  });
   revalidatePath("/workspace");
   redirect(`/workspace/organisations?created=${organisation.id}`);
 }

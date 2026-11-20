@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import { sendNotificationEmail } from "@/server/email";
@@ -52,7 +53,18 @@ export async function deliverPendingNotificationEmails(limit = 50) {
   return { sent };
 }
 
-/** Fire-and-forget email dispatch after a request; never blocks or fails the action. */
+/**
+ * Email dispatch after the response is sent; never blocks or fails the action.
+ * `after()` keeps serverless functions (Vercel) alive until delivery finishes; a bare
+ * promise would be frozen as soon as the response returned and the email never sent.
+ */
 export function scheduleNotificationEmails() {
-  void deliverPendingNotificationEmails().catch(() => undefined);
+  if (!process.env.SMTP_HOST || !process.env.EMAIL_FROM) return;
+  const run = () => deliverPendingNotificationEmails().catch((error) => console.error("Notification email delivery failed", error));
+  try {
+    after(run);
+  } catch {
+    // Outside a request (scripts, tests): run in the background.
+    void run();
+  }
 }

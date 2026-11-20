@@ -4,11 +4,11 @@ import type { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   interface Session {
-    user: { id: string; platformRole: string } & DefaultSession["user"];
+    user: { id: string; platformRole: string; sessionFingerprint?: string } & DefaultSession["user"];
   }
-  interface User { platformRole?: string }
+  interface User { platformRole?: string; sessionFingerprint?: string }
 }
 
 declare module "next-auth/jwt" {
-  interface JWT { platformRole?: string }
+  interface JWT { platformRole?: string; sessionFingerprint?: string }
 }

@@ -4,6 +4,7 @@ import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { FileList } from "@/components/FileList";
 import { decideTrustAppeal, decideTrustReview, publishCreatorProfile, publishProfessionalProfile } from "./actions";
+import { safeExternalHref } from "@/lib/safe-href";
 
 export default async function TrustReviewPage() {
   const user = await requireUser();
@@ -19,7 +20,7 @@ export default async function TrustReviewPage() {
     <PageHeader eyebrow="Operations" title="Trust and profile review" description="Record a human decision for each submitted evidence dimension. Identity evidence is restricted to platform Admins; every access is logged." />
     <section className="review-list"><h2 className="section-subhead">Evidence requests</h2>{reviews.length ? reviews.map((review) => <article className="panel review-card" key={review.id}>
       <div className="panel-header"><div><h2>{review.professional?.user.name ?? review.creator?.user.name ?? "Profile"}</h2><span className="field-note">{review.dimension.replaceAll("_", " ")} · {review.status.replaceAll("_", " ")}</span></div></div>
-      <div className="panel-content"><p className="review-objective">{review.evidenceNote}</p>{review.evidenceUrl && <p><a className="text-link" href={review.evidenceUrl} target="_blank" rel="noreferrer">Open evidence link</a></p>}{review.dimension === "IDENTITY" && !isAdmin ? <p className="field-note">Identity evidence is restricted to platform Admins.</p> : <FileList files={review.files} label="Evidence files" />}{review.professional?.portfolio.map((item) => <p className="field-note" key={item.id}>{item.title} · private sample (review access)</p>)}
+      <div className="panel-content"><p className="review-objective">{review.evidenceNote}</p>{review.evidenceUrl && <p><a className="text-link" href={safeExternalHref(review.evidenceUrl) ?? undefined} target="_blank" rel="noreferrer">Open evidence link</a></p>}{review.dimension === "IDENTITY" && !isAdmin ? <p className="field-note">Identity evidence is restricted to platform Admins.</p> : <FileList files={review.files} label="Evidence files" />}{review.professional?.portfolio.map((item) => <p className="field-note" key={item.id}>{item.title} · private sample (review access)</p>)}
         {review.dimension === "IDENTITY" && !isAdmin ? <p className="form-alert">Only a platform Admin can decide identity verification.</p> : <form action={decideTrustReview} className="review-decision-form"><input type="hidden" name="id" value={review.id} /><label>Reviewer note<textarea name="note" minLength={4} maxLength={1000} required /></label><div className="form-actions"><button className="button button-secondary" name="decision" value="REJECTED">Reject evidence</button><button className="button button-primary" name="decision" value="APPROVED">Approve this dimension</button></div></form>}
       </div>
     </article>) : <p className="field-note">No open trust-review requests.</p>}</section>

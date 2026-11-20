@@ -412,6 +412,7 @@ model PortfolioItem {
   createdAt   DateTime            @default(now())
   profile     ProfessionalProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   files       FileAsset[]
+  @@index([profileId])
 }
 
 model Project {
@@ -481,6 +482,7 @@ model Workstream {
   source      String          @default("RULE_BASED_SUGGESTION")
   project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt   DateTime        @default(now())
+  @@index([projectId])
 }
 
 model Engagement {
@@ -611,6 +613,7 @@ model Submission {
   milestone     Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
   submittedBy   User      @relation(fields: [submittedById], references: [id])
   files         FileAsset[]
+  @@index([milestoneId])
 }
 
 model MilestoneEvent {
@@ -657,6 +660,8 @@ model TrustReview {
   files                 FileAsset[]
   appeals               TrustAppeal[]
   @@index([status, submittedAt])
+  @@index([professionalProfileId])
+  @@index([creatorProfileId])
 }
 
 model SkillsAssessment {
@@ -697,6 +702,7 @@ model ProjectTask {
   assignee          ProfessionalProfile? @relation(fields: [assigneeProfileId], references: [id])
   comments          ProjectMessage[]
   @@index([projectId, status, dueAt])
+  @@index([assigneeProfileId])
 }
 
 model ProjectMessage {
@@ -714,6 +720,8 @@ model ProjectMessage {
   replies   ProjectMessage[] @relation("MessageThread")
   files     FileAsset[]
   @@index([projectId, createdAt])
+  @@index([taskId])
+  @@index([parentId])
 }
 
 model ChangeRequest {
@@ -839,6 +847,8 @@ model Campaign {
   organisation   Organisation?  @relation(fields: [organisationId], references: [id], onDelete: SetNull)
   creators       CampaignCreator[]
   @@index([status, createdAt])
+  @@index([organisationId])
+  @@index([createdById])
 }
 
 model CampaignCreator {
@@ -959,6 +969,8 @@ model CompensationObligation {
   ledgerEntries LedgerEntry[]
   pagaTransfer  PagaCompensationTransfer?
   @@index([status, createdAt])
+  @@index([recipientId, status])
+  @@index([projectId])
 }
 
 model WithdrawalRequest {
@@ -1242,6 +1254,12 @@ model FileAsset {
   campaignContent   CampaignContent? @relation(fields: [campaignContentId], references: [id], onDelete: Cascade)
   @@index([projectId, createdAt])
   @@index([ownerId, purpose])
+  @@index([submissionId])
+  @@index([messageId])
+  @@index([disputeId])
+  @@index([portfolioItemId])
+  @@index([trustReviewId])
+  @@index([campaignContentId])
 }
 
 /// A buyer's proposal to settle a milestone for less than the agreed amount.
@@ -1296,4 +1314,13 @@ model TrustAppeal {
   assessment    SkillsAssessment? @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   @@index([status, createdAt])
   @@index([userId, createdAt])
+}
+
+/// Private upload bytes for serverless deployments (PRIVATE_STORAGE_DRIVER=database).
+/// Only ever read through /api/files/[id], which re-checks access on every request.
+model StoredObject {
+  key       String   @id
+  bytes     Bytes
+  sizeBytes Int
+  createdAt DateTime @default(now())
 }

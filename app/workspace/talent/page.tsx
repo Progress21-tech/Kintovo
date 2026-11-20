@@ -5,6 +5,7 @@ import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { explainMatch } from "@/server/matching";
 import { ShortlistForm } from "./ShortlistForm";
+import { safeExternalHref } from "@/lib/safe-href";
 
 type Query = { q?: string; category?: string; skill?: string; market?: string; availability?: string; projectId?: string; language?: string; industry?: string; maxRate?: string; minLevel?: string; engagement?: string; minYears?: string; assessed?: string; sort?: string; compare?: string };
 const levelOrder = ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"];
@@ -120,7 +121,7 @@ export default async function TalentPage({ searchParams }: { searchParams: Promi
       {profile.marketExperience && <p className="talent-market">Market experience: {profile.marketExperience}</p>}
       {profile.trustReviews.length > 0 && <div className="talent-tags">{profile.trustReviews.map((review) => <span className="chip" key={review.dimension}>{review.dimension.replaceAll("_", " ")} reviewed</span>)}</div>}
       {match && <div className="match-explanation"><strong>Why this may fit</strong>{match.reasons.length ? <ul>{match.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul> : <p>No positive fit signals were identified yet.</p>}{match.gaps.length > 0 && <details><summary>Information not confirmed</summary><ul>{match.gaps.map((gap) => <li key={gap}>{gap}</li>)}</ul></details>}</div>}
-      {profile.portfolio.length > 0 && <div className="portfolio-links"><strong>Public work samples</strong>{profile.portfolio.map((item) => <a key={item.id} href={item.url ?? (item.files[0] ? `/api/files/${item.files[0].id}` : undefined)} target="_blank" rel="noreferrer">{item.title}</a>)}</div>}
+      {profile.portfolio.length > 0 && <div className="portfolio-links"><strong>Public work samples</strong>{profile.portfolio.map((item) => <a key={item.id} href={safeExternalHref(item.url) ?? (item.files[0] ? `/api/files/${item.files[0].id}` : undefined)} target="_blank" rel="noreferrer">{item.title}</a>)}</div>}
       {compareIds.includes(profile.id) ? <Link className="text-link" href={withCompare(compareIds.filter((id) => id !== profile.id))}>Remove from comparison</Link> : compareIds.length < 4 && <Link className="text-link" href={withCompare([...compareIds, profile.id])}>Add to comparison</Link>}
       <ShortlistForm profileId={profile.id} projects={projects.map((project) => ({ id: project.id, title: project.title }))} />
     </article>)}</div> : <section className="panel empty-state"><div><h3>{profiles.length ? "No profiles match those filters" : "The curated directory is being prepared"}</h3><p>{profiles.length ? "Adjust the search criteria or remove a filter." : "No specialist profiles are currently approved and published for discovery. Profiles will appear here after a human review."}</p></div></section>}

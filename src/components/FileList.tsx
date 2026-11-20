@@ -13,5 +13,5 @@ export function FileList({ files, label = "Attachments" }: { files: FileChip[]; 
 }
 
 export function FileInput({ name = "attachment", label = "Attach a file (optional)" }: { name?: string; label?: string }) {
-  return <label>{label}<input type="file" name={name} accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.mp4,.m4v,.mov,.txt,.md,.csv,.docx,.xlsx,.pptx" /><small className="field-note">Private to authorised participants. Up to {process.env.UPLOAD_MAX_MB ?? 15} MB. PDF, images, MP4/MOV, text, CSV, or Office files.</small></label>;
+  return <label>{label}<input type="file" name={name} accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.mp4,.m4v,.mov,.txt,.md,.csv,.docx,.xlsx,.pptx" /><small className="field-note">Private to authorised participants. Up to {process.env.NEXT_PUBLIC_UPLOAD_MAX_MB ?? 4} MB. PDF, images, MP4/MOV, text, CSV, or Office files.</small></label>;
 }

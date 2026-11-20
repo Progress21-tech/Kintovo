@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { FileInput, FileList, type FileChip } from "@/components/FileList";
 import { FormStatus } from "@/components/FormStatus";
 import { addPortfolioItem, deletePortfolioItem, setPortfolioVisibility } from "./portfolio-actions";
+import { safeExternalHref } from "@/lib/safe-href";
 
 export type PortfolioEntry = {
   id: string; title: string; description: string | null; category: string | null; occurredAt: string | null;
@@ -20,7 +21,7 @@ export function PortfolioManager({ items }: { items: PortfolioEntry[] }) {
         <small>{[item.category, item.occurredAt, item.skills.join(", ")].filter(Boolean).join(" · ")}</small>
         {item.description && <small>{item.description}</small>}
         {item.contribution && <small>Your contribution: {item.contribution}</small>}
-        {item.url && <small><a className="text-link" href={item.url} target="_blank" rel="noreferrer">External link</a></small>}
+        {item.url && <small><a className="text-link" href={safeExternalHref(item.url) ?? undefined} target="_blank" rel="noreferrer">External link</a></small>}
         <FileList files={item.files} label="Work sample files" />
         <div className="inline-form" style={{ marginTop: 8 }}>
           <form action={setPortfolioVisibility}><input type="hidden" name="itemId" value={item.id} /><button className="button button-secondary button-small" name="visibility" value={item.isPublic ? "PRIVATE" : "PUBLIC"}>{item.isPublic ? "Make private" : "Make public"}</button></form>

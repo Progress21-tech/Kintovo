@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { httpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 
@@ -45,7 +46,7 @@ export async function reviewAssessment(formData: FormData) {
 
 export async function submitAssessment(formData: FormData) {
   const user = await requireUser();
-  const input = z.object({ assessmentId: z.string().min(1), submittedEvidenceUrl: z.url() }).safeParse({ assessmentId: formData.get("assessmentId"), submittedEvidenceUrl: formData.get("submittedEvidenceUrl") });
+  const input = z.object({ assessmentId: z.string().min(1), submittedEvidenceUrl: httpUrl() }).safeParse({ assessmentId: formData.get("assessmentId"), submittedEvidenceUrl: formData.get("submittedEvidenceUrl") });
   if (!input.success) return;
   const assessment = await db.skillsAssessment.findUnique({ where: { id: input.data.assessmentId }, include: { professional: { select: { userId: true } } } });
   if (!assessment || assessment.professional.userId !== user.id || assessment.status !== "NOT_STARTED") return;

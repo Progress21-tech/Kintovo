@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { optionalHttpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { notify, scheduleNotificationEmails } from "@/server/notifications";
@@ -15,7 +16,7 @@ export async function requestTrustReview(_state: FormState, formData: FormData):
   const parsed = z.object({
     profileType: z.enum(["SPECIALIST", "CREATOR"]),
     dimension: z.enum(["PORTFOLIO_SKILLS", "LOCAL_EXPERTISE", "IDENTITY"]),
-    evidenceUrl: z.union([z.literal(""), z.url()]).optional(),
+    evidenceUrl: optionalHttpUrl().optional(),
     evidenceNote: z.string().trim().min(20).max(1500),
   }).safeParse(fields);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Provide enough context for a human review." };

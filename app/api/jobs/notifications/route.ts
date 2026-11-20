@@ -2,12 +2,19 @@ import { timingSafeEqual } from "node:crypto";
 import { db } from "@/server/db";
 import { deliverPendingNotificationEmails, notify } from "@/server/notifications";
 
-function authorised(request: Request) {
-  const secret = process.env.JOB_SECRET ?? "";
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (secret.length < 24 || supplied.length !== secret.length) return false;
+function matches(supplied: string, secret: string | undefined) {
+  if (!secret || secret.length < 16 || supplied.length !== secret.length) return false;
   return timingSafeEqual(Buffer.from(supplied), Buffer.from(secret));
 }
+
+/** Accepts JOB_SECRET (external cron services) or CRON_SECRET (sent automatically by Vercel Cron). */
+function authorised(request: Request) {
+  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+  return matches(supplied, process.env.JOB_SECRET) || matches(supplied, process.env.CRON_SECRET);
+}
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * Scheduled job (call every 10–15 minutes from a cron service with
@@ -15,6 +22,15 @@ function authorised(request: Request) {
  * and delivers opted-in notification emails.
  */
 export async function POST(request: Request) {
+  return runNotificationJob(request);
+}
+
+/** Vercel Cron calls scheduled paths with GET (see vercel.json). */
+export async function GET(request: Request) {
+  return runNotificationJob(request);
+}
+
+async function runNotificationJob(request: Request) {
   if (!authorised(request)) return Response.json({ error: "Unauthorised" }, { status: 401 });
   const now = new Date();
   const soon = new Date(now.getTime() + 24 * 60 * 60 * 1000);

@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getSessionUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canAccessFile } from "@/server/file-access";
 import { getProjectAccess } from "@/server/project-access";
@@ -8,11 +8,11 @@ const notFound = () => new Response("Not found", { status: 404, headers: { "Cach
 
 /** Controlled download for private uploads. Every request re-checks the viewer's access. */
 export async function GET(_request: Request, { params }: { params: Promise<{ fileId: string }> }) {
-  const session = await auth();
-  if (!session?.user?.id) return new Response("Sign in required", { status: 401, headers: { "Cache-Control": "no-store" } });
-  const viewer = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, platformRole: true, disabledAt: true, bannedAt: true } });
-  if (!viewer || viewer.disabledAt || viewer.bannedAt) return new Response("Forbidden", { status: 403 });
+  const viewer = await getSessionUser();
+  if (!viewer) return new Response("Sign in required", { status: 401, headers: { "Cache-Control": "no-store" } });
+  if (viewer.unavailable) return new Response("Forbidden", { status: 403, headers: { "Cache-Control": "no-store" } });
   const { fileId } = await params;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(fileId)) return notFound();
   const file = await db.fileAsset.findUnique({
     where: { id: fileId },
     include: {
@@ -53,7 +53,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
     headers: {
       "Content-Type": file.contentType,
       "Content-Length": String(bytes.length),
-      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${file.originalName.replace(/"/g, "")}"`,
+      // ASCII fallback plus RFC 5987 UTF-8 name: non-Latin file names otherwise make the header invalid and the download fail.
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${file.originalName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "")}"; filename*=UTF-8''${encodeURIComponent(file.originalName).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",

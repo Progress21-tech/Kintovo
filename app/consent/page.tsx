@@ -1,16 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { Brand } from "@/components/Brand";
-import { db } from "@/server/db";
+import { getSessionUser } from "@/server/access";
 import { privacyVersion, termsVersion } from "@/server/policies";
 import { PolicyAcceptanceForm } from "./PolicyAcceptanceForm";
 
 export default async function ConsentPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/sign-in");
-  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, name: true, disabledAt: true, bannedAt: true, termsVersion: true, privacyVersion: true } });
-  if (!user || user.disabledAt || user.bannedAt) redirect("/sign-in?notice=account-unavailable");
+  const user = await getSessionUser();
+  if (!user) redirect("/sign-in");
+  if (user.unavailable) redirect(user.revoked ? "/sign-in?notice=session-expired" : "/sign-in?notice=account-unavailable");
   if (user.termsVersion === termsVersion && user.privacyVersion === privacyVersion) redirect("/workspace");
   return <main className="auth-page">
     <aside className="auth-aside"><Brand href="/" inverse /><div><span className="auth-kicker">Account agreement</span><h1>Review the current documents.</h1><p>To continue using Kintovo, accept the current Terms of Service and acknowledge the Privacy Notice.</p></div><span className="auth-aside-foot">Terms {termsVersion} · Privacy {privacyVersion}</span></aside>

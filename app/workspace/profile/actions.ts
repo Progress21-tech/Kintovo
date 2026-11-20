@@ -1,9 +1,11 @@
 "use server";
 
 import { requireUser } from "@/server/access";
+import { allowAiRequest } from "@/server/rate-limit";
 import { db } from "@/server/db";
 import { enhanceCreatorProfile, enhanceSpecialistProfile, isScopeAiConfigured } from "@/server/scope-service";
 import { z } from "zod";
+import { httpUrl } from "@/server/validation";
 
 const profileInput = z.object({
   context: z.enum(["SPECIALIST", "CREATOR"]),
@@ -57,6 +59,7 @@ export async function suggestSpecialistProfile(rawInput: unknown) {
   const { consent: _consent, ...draft } = parsed.data;
   if (!Object.values(draft).some((value) => value?.trim())) return { error: "Add a headline, description, categories, skills, or market experience first." } as const;
   if (!isScopeAiConfigured()) return { error: "AI profile suggestions are not connected. The platform administrator needs to configure the AI provider." } as const;
+  if (!await allowAiRequest(user.id)) return { error: "You have reached the hourly limit for AI suggestions. Try again later." } as const;
   const result = await enhanceSpecialistProfile(draft);
   if ("error" in result) {
     const messages = {
@@ -95,6 +98,7 @@ export async function suggestCreatorProfile(rawInput: unknown) {
   const { consent: _consent, ...draft } = parsed.data;
   if (!Object.values(draft).some((value) => value?.trim())) return { error: "Add a creator description, content categories, or platforms first." } as const;
   if (!isScopeAiConfigured()) return { error: "AI profile suggestions are not connected. The platform administrator needs to configure the AI provider." } as const;
+  if (!await allowAiRequest(user.id)) return { error: "You have reached the hourly limit for AI suggestions. Try again later." } as const;
   const result = await enhanceCreatorProfile(draft);
   if ("error" in result) {
     const messages = {
@@ -134,7 +138,7 @@ export async function saveProfile(_state: { error?: string; success?: string }, 
   if (portfolioItems.length > 10) return { error: "Add up to 10 portfolio items." };
   const portfolio = portfolioItems.map((line) => {
     const [title, url, contribution = "", visibility = ""] = line.split("|").map((part) => part.trim());
-    if (!title || (url && !z.url().safeParse(url).success)) return null;
+    if (!title || (url && !httpUrl().safeParse(url).success)) return null;
     if (visibility && visibility.toLowerCase() !== "public" && visibility.toLowerCase() !== "private") return null;
     return { title, url: url || null, contribution: contribution.slice(0, 500) || null, isPublic: visibility.toLowerCase() === "public" };
   });

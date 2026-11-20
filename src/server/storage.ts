@@ -6,10 +6,15 @@ import path from "node:path";
  * Private file storage adapter.
  *
  * Files are written outside the public web root and are only ever served through
- * /api/files/[id], which checks the signed-in user's access first. The local-disk
- * adapter is the default; an S3-compatible adapter can implement the same
- * interface later (see OBJECT_STORAGE_* in .env.example). No malware scanning is
- * performed yet: uploads are type- and signature-checked only.
+ * /api/files/[id], which checks the signed-in user's access first.
+ *
+ * Adapters (PRIVATE_STORAGE_DRIVER):
+ * - "database": bytes live in the StoredObject table. Default on Vercel and other
+ *   serverless hosts, whose filesystem is read-only and not shared between instances.
+ * - "local": a persistent disk directory (PRIVATE_UPLOAD_DIR). Default elsewhere,
+ *   e.g. Docker with a mounted volume.
+ * An S3-compatible adapter can implement the same interface later. No malware
+ * scanning is performed yet: uploads are type- and signature-checked only.
  */
 export interface PrivateStorageAdapter {
   put(key: string, bytes: Buffer): Promise<void>;
@@ -37,9 +42,14 @@ export const allowedUploadTypes: Record<string, { extensions: string[]; signatur
 
 function isZip(b: Buffer) { return b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04; }
 
+/** Vercel rejects function request bodies above 4.5 MB, so larger uploads can never arrive there. */
+const serverless = Boolean(process.env.VERCEL);
+
 export function maxUploadBytes() {
-  const configured = Number(process.env.UPLOAD_MAX_MB ?? 15);
-  return (Number.isFinite(configured) && configured > 0 ? Math.min(configured, 100) : 15) * MB;
+  const fallback = serverless ? 4 : 15;
+  const configured = Number(process.env.UPLOAD_MAX_MB ?? fallback);
+  const megabytes = Number.isFinite(configured) && configured > 0 ? Math.min(configured, 100) : fallback;
+  return (serverless ? Math.min(megabytes, 4) : megabytes) * MB;
 }
 
 export type UploadCheck = { ok: true; contentType: string; safeName: string } | { ok: false; error: string };
@@ -69,9 +79,30 @@ class LocalDiskStorage implements PrivateStorageAdapter {
   async remove(key: string) { await rm(this.resolve(key), { force: true }); }
 }
 
+class DatabaseStorage implements PrivateStorageAdapter {
+  private async client() { return (await import("@/server/db")).db; }
+  async put(key: string, bytes: Buffer) { await (await this.client()).storedObject.create({ data: { key, bytes: new Uint8Array(bytes), sizeBytes: bytes.length } }); }
+  async get(key: string) {
+    const row = await (await this.client()).storedObject.findUnique({ where: { key }, select: { bytes: true } });
+    if (!row) throw new Error("Stored object not found.");
+    return Buffer.from(row.bytes);
+  }
+  async remove(key: string) { await (await this.client()).storedObject.deleteMany({ where: { key } }); }
+}
+
+export function storageDriver(): "database" | "local" {
+  const configured = process.env.PRIVATE_STORAGE_DRIVER?.trim().toLowerCase();
+  if (configured === "database" || configured === "local") return configured;
+  return serverless ? "database" : "local";
+}
+
 let adapter: PrivateStorageAdapter | null = null;
 export function privateStorage(): PrivateStorageAdapter {
-  if (!adapter) adapter = new LocalDiskStorage(path.resolve(process.env.PRIVATE_UPLOAD_DIR || path.join(process.cwd(), ".data", "private-uploads")));
+  if (!adapter) {
+    adapter = storageDriver() === "database"
+      ? new DatabaseStorage()
+      : new LocalDiskStorage(path.resolve(process.env.PRIVATE_UPLOAD_DIR || path.join(process.cwd(), ".data", "private-uploads")));
+  }
   return adapter;
 }
 

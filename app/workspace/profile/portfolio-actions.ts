@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { optionalHttpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { privateStorage, storeUpload, isUploadError, validateUpload } from "@/server/storage";
@@ -19,7 +20,7 @@ export async function addPortfolioItem(_state: FormState, formData: FormData): P
     description: z.string().trim().max(2000).optional(),
     category: z.string().trim().max(100).optional(),
     occurredAt: z.string().optional(),
-    url: z.union([z.literal(""), z.url()]).optional(),
+    url: optionalHttpUrl().optional(),
     contribution: z.string().trim().min(10, "Describe your own contribution in at least 10 characters.").max(1000),
     skills: z.string().max(500).optional(),
     visibility: z.enum(["PRIVATE", "PUBLIC"]),

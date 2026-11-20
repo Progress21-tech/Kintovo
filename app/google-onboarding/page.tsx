@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { getSessionUser } from "@/server/access";
 import { Brand } from "@/components/Brand";
 import { db } from "@/server/db";
 import { GoogleOnboardingForm } from "./GoogleOnboardingForm";
 
 export default async function GoogleOnboardingPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/sign-in");
+  const user = await getSessionUser();
+  if (!user) redirect("/sign-in");
+  if (user.unavailable) redirect("/sign-in?notice=account-unavailable");
   const [membership, specialist, creator] = await Promise.all([
-    db.organisationMembership.findFirst({ where: { userId: session.user.id }, select: { id: true } }),
-    db.professionalProfile.findUnique({ where: { userId: session.user.id }, select: { id: true } }),
-    db.creatorProfile.findUnique({ where: { userId: session.user.id }, select: { id: true } }),
+    db.organisationMembership.findFirst({ where: { userId: user.id }, select: { id: true } }),
+    db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+    db.creatorProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
   ]);
   if (membership || specialist || creator) redirect("/workspace");
   return <main className="auth-page">

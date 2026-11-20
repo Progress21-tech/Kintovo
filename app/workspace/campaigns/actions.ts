@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { optionalHttpUrl, httpUrl } from "@/server/validation";
 import { requireUser } from "@/server/access";
 import { db } from "@/server/db";
 import { canManageProjects } from "@/server/permissions";
@@ -43,7 +44,7 @@ async function campaignManager(campaignId: string, userId: string) {
 export async function createCampaign(formData: FormData) {
   const user = await requireUser();
   if (!await platformFlag("CAMPAIGNS_ENABLED")) return;
-  const input = z.object({ title: z.string().trim().min(4).max(140), brief: z.string().trim().min(30).max(4000), organisationId: z.string().min(1), platforms: z.string().max(500), contentTypes: z.string().max(500), usageRights: z.string().trim().max(2000).optional(), landingUrl: z.union([z.literal(""), z.url()]).optional(), startsAt: z.string().optional(), endsAt: z.string().optional(), currency: z.enum(currencies), fixedFee: z.string(), bonusRate: z.string(), bonusCap: z.string().optional(), bonusTerms: z.string().trim().max(1000).optional() }).safeParse(Object.fromEntries(formData.entries()));
+  const input = z.object({ title: z.string().trim().min(4).max(140), brief: z.string().trim().min(30).max(4000), organisationId: z.string().min(1), platforms: z.string().max(500), contentTypes: z.string().max(500), usageRights: z.string().trim().max(2000).optional(), landingUrl: optionalHttpUrl().optional(), startsAt: z.string().optional(), endsAt: z.string().optional(), currency: z.enum(currencies), fixedFee: z.string(), bonusRate: z.string(), bonusCap: z.string().optional(), bonusTerms: z.string().trim().max(1000).optional() }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return;
   const details = campaignDetails.safeParse(Object.fromEntries(formData.entries()));
   if (!details.success) redirect(`/workspace/campaigns?error=${encodeURIComponent(details.error.issues[0]?.message ? `${details.error.issues[0].path.join(".")}: ${details.error.issues[0].message}` : "Check the campaign details.")}`);
@@ -144,7 +145,7 @@ export async function updateCampaignStatus(formData: FormData) {
 
 export async function submitCampaignContent(formData: FormData) {
   const user = await requireUser();
-  const input = z.object({ campaignCreatorId: z.string().min(1), title: z.string().trim().min(3).max(140), submissionUrl: z.union([z.literal(""), z.url()]).optional(), note: z.string().trim().min(10).max(2500) }).safeParse(Object.fromEntries(formData.entries()));
+  const input = z.object({ campaignCreatorId: z.string().min(1), title: z.string().trim().min(3).max(140), submissionUrl: optionalHttpUrl().optional(), note: z.string().trim().min(10).max(2500) }).safeParse(Object.fromEntries(formData.entries()));
   if (!input.success) return;
   const invitation = await db.campaignCreator.findUnique({ where: { id: input.data.campaignCreatorId }, include: { creator: { select: { userId: true } }, campaign: { select: { id: true, createdById: true, status: true } } } });
   if (!invitation || invitation.creator.userId !== user.id || !["ACCEPTED", "ACTIVE"].includes(invitation.status) || invitation.campaign.status !== "ACTIVE") return;
@@ -172,7 +173,7 @@ export async function reviewCampaignContent(formData: FormData) {
 
 export async function recordPublishedContent(formData: FormData) {
   const user = await requireUser();
-  const input = z.object({ contentId: z.string().min(1), publishedUrl: z.url() }).safeParse({ contentId: formData.get("contentId"), publishedUrl: formData.get("publishedUrl") });
+  const input = z.object({ contentId: z.string().min(1), publishedUrl: httpUrl() }).safeParse({ contentId: formData.get("contentId"), publishedUrl: formData.get("publishedUrl") });
   if (!input.success) return;
   const content = await db.campaignContent.findUnique({ where: { id: input.data.contentId }, include: { campaignCreator: { include: { creator: { select: { userId: true } }, campaign: true } } } });
   if (!content || content.campaignCreator.creator.userId !== user.id || content.status !== "APPROVED") return;

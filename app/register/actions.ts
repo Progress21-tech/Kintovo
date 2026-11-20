@@ -4,7 +4,9 @@ import bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
+import { optionalHttpUrl } from "@/server/validation";
 import { db } from "@/server/db";
 import { sendAccountEmail } from "@/server/email";
 import { consumeRateLimit, rateLimitKey } from "@/server/rate-limit";
@@ -26,7 +28,7 @@ const accountSchema = z.object({
   acceptPrivacy: z.literal("on"),
   context: z.enum(["BUSINESS", "SPECIALIST", "CREATOR"]),
   organisation: z.string().trim().max(120).optional(),
-  website: z.union([z.literal(""), z.url()]).optional(),
+  website: optionalHttpUrl().optional(),
   industry: z.string().trim().max(120).optional(),
   model: z.string().trim().max(120).optional(),
   product: z.string().trim().max(300).optional(),
@@ -120,15 +122,20 @@ export async function registerAccount(_state: { error?: string; success?: string
     console.error("[Kintovo auth] signup account creation failed", { email: maskEmail(parsed.data.email), error });
     return { error: "We could not create your account right now. Please try again later." };
   }
-  // Provision the user's real Paga Sandbox account after the account transaction
-  // commits. Registration remains available if Paga is temporarily unreachable;
-  // the pending account can be retried from the finance workflow.
-  try {
-    if (createdOrganisationId) await ensurePagaOrganisationAccount(createdOrganisationId);
-    else if (createdUserId) await ensurePagaUserAccount(createdUserId);
-  } catch (error) {
-    console.error("Paga Sandbox account provisioning did not complete", { accountContext: parsed.data.context, error });
-  }
+  // Provision the user's real Paga Sandbox account after the response is sent, so a
+  // slow payment provider never delays sign-up. Registration remains available if Paga
+  // is unreachable; the pending account can be retried from the funding/earnings pages.
+  const organisationToProvision: string | null = createdOrganisationId;
+  const userToProvision: string | null = createdUserId;
+  const accountContext = parsed.data.context;
+  after(async () => {
+    try {
+      if (organisationToProvision) await ensurePagaOrganisationAccount(organisationToProvision);
+      else if (userToProvision) await ensurePagaUserAccount(userToProvision);
+    } catch (error) {
+      console.error("Paga Sandbox account provisioning did not complete", { accountContext, error });
+    }
+  });
   console.info("[Kintovo auth] signup accepted", { email: maskEmail(parsed.data.email), requireEmailVerification });
   return {
     success: requireEmailVerification

@@ -74,7 +74,9 @@ export async function submitProposal(_state: { error?: string; success?: string 
   if ((!isTalent && !isBuyer) || (!parsed.data.previousProposalId && !isTalent)) return { error: "You cannot submit an offer for this opportunity." };
   if (parsed.data.previousProposalId) {
     const previous = engagement.proposals[0];
-    if (!previous || previous.id !== parsed.data.previousProposalId || previous.status !== "OPEN" || previous.authorId === user.id) return { error: "Only the latest open offer from the other party can be countered." };
+    // The counter must come from the other side: a colleague cannot counter their own organisation's offer.
+    const previousByTalent = previous?.authorId === engagement.professional.userId;
+    if (!previous || previous.id !== parsed.data.previousProposalId || previous.status !== "OPEN" || previous.authorId === user.id || (previousByTalent ? !isBuyer : !isTalent)) return { error: "Only the latest open offer from the other party can be countered." };
   } else if (engagement.proposals.length) return { error: "Respond to the latest proposal instead of starting a second offer." };
   const version = (engagement.proposals[0]?.version ?? 0) + 1;
   await db.$transaction(async (tx) => {
@@ -119,6 +121,9 @@ export async function declineProposal(formData: FormData) {
   const isBuyer = Boolean(membership && canManageProjects(membership.role));
   const isTalent = proposal.engagement.professional.userId === user.id;
   if (!isBuyer && !isTalent) return;
+  const authoredByTalent = proposal.authorId === proposal.engagement.professional.userId;
+  // Only the author may withdraw; only the other party may decline.
+  if (proposal.authorId !== user.id && (authoredByTalent ? !isBuyer : !isTalent)) return;
   if (proposal.authorId === user.id) {
     await db.proposal.update({ where: { id: proposal.id }, data: { status: "WITHDRAWN" } });
   } else {
@@ -139,7 +144,9 @@ export async function acceptProposal(formData: FormData) {
   const membership = await db.organisationMembership.findUnique({ where: { organisationId_userId: { organisationId: proposal.engagement.project.organisationId, userId: user.id } } });
   const isBuyer = Boolean(membership && canApproveSpend(membership.role, membership.canApproveSpend));
   const isTalent = proposal.engagement.professional.userId === user.id;
-  if (!isBuyer && !isTalent) return;
+  // Only the other party may accept: a colleague of the author cannot accept their own side's offer.
+  const authoredByTalent = proposal.authorId === proposal.engagement.professional.userId;
+  if (authoredByTalent ? !isBuyer : !isTalent) return;
   const existing = await db.agreement.findFirst({ where: { engagementId: proposal.engagementId } });
   if (existing) return;
   const agreement = await db.$transaction(async (tx) => {

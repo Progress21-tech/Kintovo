@@ -66,7 +66,7 @@ export async function sendNotificationEmail(to: string, title: string, body: str
   const from = process.env.EMAIL_FROM;
   if (!host || !from) return;
   const base = process.env.AUTH_URL ?? "http://localhost:3000";
-  const url = href ? new URL(href.startsWith("/") ? href : "/workspace/notifications", base).toString() : new URL("/workspace/notifications", base).toString();
+  const url = href ? new URL(href.startsWith("/") && !href.startsWith("//") && !href.startsWith("/\\") ? href : "/workspace/notifications", base).toString() : new URL("/workspace/notifications", base).toString();
   const transporter = nodemailer.createTransport({
     host,
     port: Number(process.env.SMTP_PORT ?? 587),

@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test src/server/scoping.test.ts src/server/permissions.test.ts src/server/campaigns.test.ts src/server/payments.test.ts src/server/paga.test.ts src/server/platform-gaps.test.ts src/server/integration.test.ts",
+    "test": "tsx --test --test-concurrency=1 src/server/scoping.test.ts src/server/permissions.test.ts src/server/campaigns.test.ts src/server/payments.test.ts src/server/paga.test.ts src/server/platform-gaps.test.ts src/server/integration.test.ts src/server/security-audit.test.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

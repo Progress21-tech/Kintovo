@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { optionalHttpUrl } from "@/server/validation";
+import { getSessionUser } from "@/server/access";
 import { db } from "@/server/db";
 import { privacyVersion, termsVersion } from "@/server/policies";
 
@@ -11,7 +12,7 @@ const onboardingSchema = z.object({
   acceptTerms: z.literal("on"),
   acceptPrivacy: z.literal("on"),
   organisation: z.string().trim().min(2).max(120).optional(),
-  website: z.union([z.literal(""), z.url()]).optional(),
+  website: optionalHttpUrl().optional(),
   industry: z.string().trim().max(120).optional(),
   model: z.string().trim().max(120).optional(),
   product: z.string().trim().max(300).optional(),
@@ -26,13 +27,13 @@ function splitList(value: string | undefined) {
 }
 
 export async function completeGoogleOnboarding(_state: { error?: string }, formData: FormData): Promise<{ error?: string }> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/sign-in");
+  const sessionUser = await getSessionUser();
+  if (!sessionUser) redirect("/sign-in");
   const parsed = onboardingSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the onboarding details." };
   if (parsed.data.context === "BUSINESS" && !parsed.data.organisation) return { error: "Enter your organisation name." };
-  const user = await db.user.findUnique({ where: { id: session.user.id }, select: { id: true, disabledAt: true, bannedAt: true } });
-  if (!user || user.disabledAt || user.bannedAt) redirect("/sign-in?notice=account-unavailable");
+  const user = sessionUser;
+  if (user.unavailable) redirect("/sign-in?notice=account-unavailable");
   const existing = await Promise.all([
     db.organisationMembership.findFirst({ where: { userId: user.id }, select: { id: true } }),
     db.professionalProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),

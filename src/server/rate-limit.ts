@@ -33,3 +33,8 @@ export async function rateLimitLogin(email: string, ip: string) {
   ]);
   return results.every(Boolean);
 }
+
+/** Caps paid AI-provider calls per account (planner, brief generation, profile suggestions). */
+export async function allowAiRequest(userId: string) {
+  return consumeRateLimit(rateLimitKey("ai-request", userId), 30, 60 * 60);
+}
